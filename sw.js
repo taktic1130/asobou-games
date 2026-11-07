@@ -1,5 +1,5 @@
 // オフラインでも あそべるように ぜんぶ ほぞんしておく
-const CACHE = 'asobou-v2';
+const CACHE = 'asobou-v3';
 const FILES = ['./', './index.html', './shinkansen.html', './cooking.html', './fumikiri.html',
   './manifest.json', './icon-192.png', './icon-512.png'];
 
@@ -14,7 +14,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request).then(res => {
+    fetch(e.request, { cache: 'no-cache' }).then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));
       return res;
