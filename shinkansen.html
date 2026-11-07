@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff7eb6">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script>if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js");</script>
+<title>しんかんせん</title>
+<style>
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; touch-action: none; background: #bfe9ff;
+    font-family: "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Meiryo", sans-serif; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+  .btn { position: fixed; border: 6px solid #fff; border-radius: 999px; font-weight: bold; color: #fff;
+    box-shadow: 0 8px 0 rgba(0,0,0,.15); font-family: inherit; cursor: pointer; }
+  .btn:active { transform: translateY(5px); box-shadow: 0 3px 0 rgba(0,0,0,.15); }
+  #home { top: 14px; left: 14px; width: 72px; height: 72px; font-size: 36px; background: #ff7eb6; padding: 0; }
+  #go { left: 50%; bottom: 4vh; transform: translateX(-50%); font-size: clamp(28px, 4.5vw, 54px);
+    padding: 18px 48px; background: #ff4f9a; animation: pulse 1.2s infinite; }
+  #go:active { transform: translateX(-50%) translateY(5px); }
+  #go.hide { display: none; }
+  @keyframes pulse { 50% { scale: 1.08; } }
+  #horn { right: 18px; bottom: 4vh; width: clamp(90px, 11vw, 130px); height: clamp(90px, 11vw, 130px);
+    font-size: clamp(22px, 2.6vw, 30px); background: #ffc93c; color: #8a4b00; line-height: 1.1; padding: 0; }
+  #score { position: fixed; top: 16px; right: 18px; background: #fff; color: #e0457b; border-radius: 30px;
+    padding: 8px 22px; font-size: clamp(26px, 3.5vw, 40px); font-weight: bold; box-shadow: 0 5px 0 rgba(0,0,0,.1); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button class="btn" id="home" onclick="location.href='index.html'">🏠</button>
+<div id="score">⭐ 0</div>
+<button class="btn" id="go">しゅっぱつ！</button>
+<button class="btn" id="horn">📯<br>ぷぁーん</button>
+<script>
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+let W, H, DPR;
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  W = innerWidth; H = innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener('resize', resize); resize();
+
+// ---------- おと ----------
+let AC;
+function ac() { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); return AC; }
+function tone(freq, dur, type = 'sine', vol = .2, when = 0, slideTo) {
+  const a = ac(), t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .05);
+}
+function horn() { tone(440, .9, 'sawtooth', .08); tone(554, .9, 'sawtooth', .08); tone(660, .9, 'triangle', .05); }
+function pop() { tone(500, .18, 'sine', .25, 0, 1400); tone(1200, .15, 'triangle', .1, .08); }
+function chime() { [784, 659, 523, 659, 784, 1046].forEach((f, i) => tone(f, .5, 'sine', .18, i * .22)); }
+function say(t) {
+  try { const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; u.rate = .95; u.pitch = 1.3;
+    speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
+}
+
+// ---------- データ ----------
+const STATIONS = ['いちご', 'ばなな', 'もも', 'めろん', 'りんご', 'ぶどう', 'みかん', 'さくらんぼ'];
+const ANIMALS = ['🐰', '🐻', '🐼', '🐱', '🐶', '🐸', '🐷', '🐨', '🦊', '🐧', '🐹', '🐯'];
+const GOODIES = ['⭐', '🍓', '🍬', '🌸', '💖', '🍭', '🌟', '🍩'];
+let dist = 0, speed = 0, state = 'stopped'; // stopped / running / braking
+const MAX = () => W * 0.9;
+let stIndex = 0, station = { x: 0, name: STATIONS[0], animal: ANIMALS[0], boarded: true };
+let passengers = [];
+let items = [], parts = [], score = 0, t0 = performance.now(), time = 0;
+let boarding = null; // {animal, p}
+
+function trainCx() { return W * 0.42; }
+// はじめは駅にとまっている
+station.x = trainCx(); station.boarded = true;
+
+function newStation() {
+  stIndex++;
+  station = { x: dist + trainCx() + W * 4.5, name: STATIONS[stIndex % STATIONS.length],
+    animal: ANIMALS[(Math.random() * ANIMALS.length) | 0], boarded: false };
+}
+
+// ---------- ボタン ----------
+const goBtn = document.getElementById('go');
+goBtn.addEventListener('pointerdown', e => {
+  e.stopPropagation(); ac();
+  if (state !== 'stopped' || boarding) return;
+  horn(); say('しゅっぱつ しんこう！');
+  state = 'running'; goBtn.classList.add('hide');
+  newStation();
+});
+document.getElementById('horn').addEventListener('pointerdown', e => { e.stopPropagation(); horn(); });
+
+// タップでおたからをとる
+cv.addEventListener('pointerdown', e => {
+  ac();
+  const x = e.clientX, y = e.clientY;
+  let hit = false;
+  for (const it of items) {
+    if (it.got) continue;
+    const r = it.size * 0.9;
+    if (Math.hypot(x - it.sx, y - it.sy) < r) { it.got = true; hit = true; score++; burst(it.sx, it.sy); pop(); break; }
+  }
+  if (!hit) { burst(x, y, 6); tone(880 + Math.random() * 400, .12, 'triangle', .12); }
+  document.getElementById('score').textContent = '⭐ ' + score;
+});
+function burst(x, y, n = 14) {
+  const cols = ['#ff7eb6', '#ffd23f', '#ffffff', '#ff4f9a', '#fff176'];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = 100 + Math.random() * 300;
+    parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, c: cols[i % cols.length], r: 4 + Math.random() * 7 });
+  }
+}
+
+// ---------- 背景 ----------
+function rnd(i) { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+function drawSky() {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#9fdcff'); g.addColorStop(.6, '#ffe3f0'); g.addColorStop(1, '#fff3c4');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // おひさま
+  ctx.save(); ctx.translate(W * 0.85, H * 0.18);
+  ctx.rotate(time * 0.3);
+  ctx.fillStyle = '#ffd23f';
+  for (let i = 0; i < 12; i++) { ctx.rotate(Math.PI / 6); ctx.fillRect(-4, H * 0.07, 8, H * 0.035); }
+  ctx.beginPath(); ctx.arc(0, 0, H * 0.065, 0, 7); ctx.fill();
+  ctx.restore();
+  // くも
+  const cw = W * 0.5;
+  for (let k = -1; k < 4; k++) {
+    const base = Math.floor(dist * 0.1 / cw);
+    const i = base + k, x = i * cw - dist * 0.1 + rnd(i) * cw * .5, y = H * (0.08 + rnd(i + 5) * 0.2);
+    cloud(x, y, H * 0.05);
+  }
+}
+function cloud(x, y, r) {
+  ctx.fillStyle = 'rgba(255,255,255,.95)';
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.arc(x + r, y - r * .5, r * 1.2, 0, 7); ctx.arc(x + r * 2.2, y, r, 0, 7);
+  ctx.fill(); ctx.fillRect(x, y - r * .2, r * 2.2, r * 1.2 - r * .2 + 1);
+}
+function drawHills(par, yBase, h, col, period, seed) {
+  ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, H);
+  const off = dist * par;
+  for (let x = 0; x <= W + 20; x += 20) {
+    const wx = (x + off) / period;
+    const y = yBase - h * (0.55 + 0.3 * Math.sin(wx + seed) + 0.15 * Math.sin(wx * 2.3 + seed * 2));
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, H); ctx.fill();
+}
+function drawMountain() {
+  // とおくの おおきな やま（ゆっくりうごく）
+  const x = ((W * 0.6 - dist * 0.03) % (W * 2) + W * 2) % (W * 2) - W * 0.3;
+  const y = H * 0.62, w = H * 0.45, h = H * 0.33;
+  ctx.fillStyle = '#9b8fd9';
+  ctx.beginPath(); ctx.moveTo(x - w, y); ctx.lineTo(x - w * .15, y - h); ctx.lineTo(x + w * .15, y - h); ctx.lineTo(x + w, y); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.moveTo(x - w * .4, y - h * .62); ctx.lineTo(x - w * .15, y - h); ctx.lineTo(x + w * .15, y - h);
+  ctx.lineTo(x + w * .4, y - h * .62); ctx.lineTo(x + w * .2, y - h * .55); ctx.lineTo(x, y - h * .65); ctx.lineTo(x - w * .2, y - h * .55); ctx.fill();
+}
+function drawTrees(groundY) {
+  const per = W * 0.13, par = 0.6;
+  const base = Math.floor(dist * par / per);
+  for (let k = -1; k < W / per + 2; k++) {
+    const i = base + k, x = i * per - dist * par + rnd(i) * per * .6;
+    const s = H * (0.05 + rnd(i + 3) * 0.04), y = groundY - H * 0.04;
+    if (rnd(i + 9) < 0.5) { // さくら
+      ctx.fillStyle = '#9c6b4a'; ctx.fillRect(x - s * .12, y - s * 1.2, s * .24, s * 1.2);
+      ctx.fillStyle = rnd(i + 2) < .5 ? '#ffb3d1' : '#ff8fc4';
+      ctx.beginPath(); ctx.arc(x, y - s * 1.4, s * .8, 0, 7); ctx.arc(x - s * .6, y - s * 1.1, s * .55, 0, 7); ctx.arc(x + s * .6, y - s * 1.1, s * .55, 0, 7); ctx.fill();
+    } else { // ひまわりばたけ
+      for (let j = 0; j < 3; j++) {
+        const fx = x + j * s * .7, fy = y - s * .6 - (j % 2) * s * .2;
+        ctx.strokeStyle = '#5cab4a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(fx, y); ctx.lineTo(fx, fy); ctx.stroke();
+        ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(fx, fy, s * .28, 0, 7); ctx.fill();
+        ctx.fillStyle = '#8a4b00'; ctx.beginPath(); ctx.arc(fx, fy, s * .11, 0, 7); ctx.fill();
+      }
+    }
+  }
+}
+function drawTrack(groundY) {
+  ctx.fillStyle = '#c9b8a8'; ctx.fillRect(0, groundY, W, H * 0.05);
+  ctx.fillStyle = '#b5e38c'; ctx.fillRect(0, groundY + H * 0.05, W, H);
+  // まくらぎ
+  const per = 40, off = dist % per;
+  ctx.fillStyle = '#8d6e63';
+  for (let x = -off; x < W + per; x += per) ctx.fillRect(x, groundY + H * 0.012, 18, H * 0.03);
+  ctx.fillStyle = '#7a7a8c'; ctx.fillRect(0, groundY + H * 0.008, W, 5);
+  // でんちゅう
+  const pp = W * 0.35, poff = dist % pp;
+  ctx.fillStyle = '#9e9e9e';
+  for (let x = -poff; x < W + pp; x += pp) { ctx.fillRect(x, groundY - H * 0.32, 6, H * 0.32); ctx.fillRect(x - 14, groundY - H * 0.32, 34, 6); }
+  ctx.strokeStyle = '#777'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, groundY - H * 0.31); ctx.lineTo(W, groundY - H * 0.31); ctx.stroke();
+}
+function drawStation(groundY, back) {
+  const cx = station.x - dist, pw = W * 0.95, ph = H * 0.06;
+  if (cx + pw < -50 || cx - pw > W + 50) return;
+  if (back) {
+    // やね
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillRect(cx - pw / 2, groundY - H * 0.36, pw, H * 0.035);
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i <= 4; i++) ctx.fillRect(cx - pw / 2 + i * (pw / 4) - 4, groundY - H * 0.33, 8, H * 0.27);
+    // かんばん
+    const bw = Math.min(W * 0.34, 420), bh = H * 0.09, by = groundY - H * 0.5;
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ff4f9a'; ctx.lineWidth = 6;
+    roundRect(cx - bw / 2, by, bw, bh, 18); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e0457b'; ctx.font = `bold ${bh * 0.55}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(station.name + ' えき', cx, by + bh / 2 + 2);
+    ctx.fillStyle = '#9e9e9e'; ctx.fillRect(cx - bw * .3, by + bh, 6, H * 0.14 - bh); ctx.fillRect(cx + bw * .3, by + bh, 6, H * 0.14 - bh);
+  } else {
+    // ホーム（てまえ）
+    ctx.fillStyle = '#ffe9a8'; ctx.fillRect(cx - pw / 2, groundY + H * 0.01, pw, ph);
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(cx - pw / 2, groundY + H * 0.01, pw, 8);
+    // まってる どうぶつ
+    if (!station.boarded && !boarding) {
+      const s = H * 0.09;
+      ctx.font = `${s}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(station.animal, cx + Math.sin(time * 6) * 3, groundY + H * 0.06 - Math.abs(Math.sin(time * 5)) * 10);
+    }
+  }
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+// ---------- しんかんせん ----------
+function drawTrain(groundY) {
+  const cars = 3, L = Math.min(W * 0.2, H * 0.42), Ht = L * 0.32, gap = L * 0.04;
+  const nose = L * 0.7;
+  const total = cars * L + (cars - 1) * gap + nose;
+  const x0 = trainCx() - total / 2;
+  const bounce = speed > 5 ? Math.sin(time * 30) * 1.2 : 0;
+  const y = groundY - Ht - L * 0.06 + bounce;
+  let win = 0;
+  for (let c = 0; c < cars; c++) {
+    const x = x0 + c * (L + gap);
+    const isFront = c === cars - 1;
+    // しゃたい
+    ctx.fillStyle = '#ff8fc4';
+    ctx.beginPath();
+    if (isFront) {
+      ctx.moveTo(x + 10, y);
+      ctx.lineTo(x + L, y);
+      ctx.bezierCurveTo(x + L + nose * 0.55, y, x + L + nose, y + Ht * 0.7, x + L + nose, y + Ht * 0.9);
+      ctx.lineTo(x + L + nose, y + Ht);
+      ctx.lineTo(x, y + Ht); ctx.lineTo(x, y + 10); ctx.quadraticCurveTo(x, y, x + 10, y);
+    } else if (c === 0) {
+      ctx.moveTo(x + Ht * 0.5, y); ctx.lineTo(x + L, y); ctx.lineTo(x + L, y + Ht); ctx.lineTo(x, y + Ht);
+      ctx.lineTo(x, y + Ht * 0.6); ctx.quadraticCurveTo(x, y, x + Ht * 0.5, y);
+    } else { roundRect(x, y, L, Ht, 10); }
+    ctx.fill();
+    // しろい おなか
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 5, y + Ht * 0.68, L + nose + 10, Ht);
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(x - 5, y + Ht * 0.6, L + nose + 10, Ht * 0.09);
+    ctx.restore();
+    // まど
+    const nw = 4, ww = L * 0.15, wh = Ht * 0.3, wy = y + Ht * 0.18;
+    for (let i = 0; i < nw; i++) {
+      const wx = x + L * 0.1 + i * (L * 0.8 / nw) + (L * 0.8 / nw - ww) / 2;
+      ctx.fillStyle = '#e3f6ff'; roundRect(wx, wy, ww, wh, 6); ctx.fill();
+      const p = passengers[win];
+      if (p) { ctx.font = `${wh * 0.95}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(p, wx + ww / 2, wy + wh * 0.6); }
+      win++;
+    }
+    // ドア
+    ctx.strokeStyle = 'rgba(194,24,91,.35)'; ctx.lineWidth = 2;
+    ctx.strokeRect(x + L * 0.02, y + Ht * 0.15, L * 0.07, Ht * 0.5);
+    if (isFront) {
+      // うんてんせき の まど
+      ctx.fillStyle = '#4a3b6b';
+      ctx.beginPath(); ctx.moveTo(x + L + nose * 0.05, y + Ht * 0.08);
+      ctx.quadraticCurveTo(x + L + nose * 0.45, y + Ht * 0.1, x + L + nose * 0.6, y + Ht * 0.42);
+      ctx.lineTo(x + L + nose * 0.05, y + Ht * 0.42); ctx.closePath(); ctx.fill();
+      // ライト
+      ctx.fillStyle = '#fffbe0'; ctx.beginPath(); ctx.ellipse(x + L + nose * 0.85, y + Ht * 0.78, nose * 0.06, Ht * 0.06, 0, 0, 7); ctx.fill();
+      // ほっぺ
+      ctx.fillStyle = 'rgba(255,79,154,.5)'; ctx.beginPath(); ctx.ellipse(x + L + nose * 0.45, y + Ht * 0.6, nose * 0.08, Ht * 0.06, 0, 0, 7); ctx.fill();
+    }
+    // しゃりん
+    ctx.fillStyle = '#5d5470';
+    ctx.fillRect(x + L * 0.08, y + Ht, L * 0.25, L * 0.05); ctx.fillRect(x + L * 0.67, y + Ht, L * 0.25, L * 0.05);
+    for (const wx of [0.13, 0.28, 0.72, 0.87]) {
+      ctx.fillStyle = '#3d3550'; ctx.beginPath(); ctx.arc(x + L * wx, y + Ht + L * 0.04, L * 0.035, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#bbb'; ctx.lineWidth = 2; ctx.beginPath();
+      const a = dist / (L * 0.035);
+      ctx.moveTo(x + L * wx, y + Ht + L * 0.04); ctx.lineTo(x + L * wx + Math.cos(a) * L * 0.03, y + Ht + L * 0.04 + Math.sin(a) * L * 0.03); ctx.stroke();
+    }
+    // パンタグラフ
+    if (c === 1) {
+      ctx.strokeStyle = '#666'; ctx.lineWidth = 3; ctx.beginPath();
+      ctx.moveTo(x + L * 0.4, y); ctx.lineTo(x + L * 0.5, y - Ht * 0.35); ctx.lineTo(x + L * 0.6, y); ctx.stroke();
+      ctx.fillRect(x + L * 0.42, y - Ht * 0.37, L * 0.16, 3);
+    }
+  }
+  // のりこみ アニメ
+  if (boarding) {
+    const p = boarding.p, cx = station.x - dist;
+    const sx = cx, sy = groundY + H * 0.06, ex = x0 + L * 0.05, ey = y + Ht * 0.5;
+    const bx = sx + (ex - sx) * p, by = sy + (ey - sy) * p - Math.sin(p * Math.PI) * H * 0.15;
+    ctx.font = `${H * 0.09 * (1 - p * 0.5)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(boarding.animal, bx, by);
+  }
+  // スピードの せん
+  if (speed > MAX() * 0.5) {
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 3;
+    for (let i = 0; i < 6; i++) {
+      const ly = y + rnd(i + Math.floor(time * 8)) * Ht, lx = x0 - 40 - rnd(i * 3 + Math.floor(time * 8)) * 120;
+      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx - 60 - speed * 0.05, ly); ctx.stroke();
+    }
+  }
+}
+
+// ---------- おたから ----------
+let spawnT = 0;
+function updItems(dt) {
+  spawnT -= dt;
+  if (state !== 'stopped' && spawnT <= 0 && items.length < 6) {
+    spawnT = 0.7 + Math.random() * 1.0;
+    items.push({ wx: dist * 0.5 + W + 60, y: H * (0.15 + Math.random() * 0.3), e: GOODIES[(Math.random() * GOODIES.length) | 0],
+      size: Math.min(W, H) * 0.09, ph: Math.random() * 6, got: false, gt: 0 });
+  }
+  for (const it of items) {
+    it.sx = it.wx - dist * 0.5; it.sy = it.y + Math.sin(time * 2 + it.ph) * 14;
+    if (it.got) it.gt += dt * 2.5;
+  }
+  items = items.filter(it => it.sx > -100 && it.gt < 1);
+}
+function drawItems() {
+  for (const it of items) {
+    const s = it.size * (it.got ? 1 + it.gt : 1);
+    ctx.globalAlpha = it.got ? 1 - it.gt : 1;
+    ctx.font = `${s}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(it.e, it.sx, it.sy - (it.got ? it.gt * 60 : 0));
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ---------- メインループ ----------
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; time += dt;
+  const target = station.x - trainCx();
+  if (state === 'running') {
+    speed = Math.min(MAX(), speed + W * 0.35 * dt);
+    const remain = target - dist;
+    if (!station.boarded && remain > 0 && remain < (speed * speed) / (2 * W * 0.3) + 5) state = 'braking';
+  }
+  if (state === 'braking') {
+    const remain = target - dist;
+    if (remain <= 1) { dist = target; speed = 0; arrive(); }
+    else { const a = speed * speed / (2 * remain); speed = Math.max(20, speed - a * dt); }
+  }
+  dist += speed * dt;
+  if (boarding) {
+    boarding.p += dt * 0.9;
+    if (boarding.p >= 1) {
+      passengers.unshift(boarding.animal); if (passengers.length > 12) passengers.pop();
+      boarding = null; tone(1046, .2, 'sine', .2); tone(1318, .3, 'sine', .2, .12);
+      setTimeout(() => { goBtn.classList.remove('hide'); }, 400);
+    }
+  }
+  updItems(dt);
+  for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 500 * dt; p.life -= dt * 1.4; }
+  parts = parts.filter(p => p.life > 0);
+
+  const groundY = H * 0.74;
+  drawSky(); drawMountain();
+  drawHills(0.15, H * 0.66, H * 0.12, '#c8f0a8', W * 0.25, 1);
+  drawHills(0.3, H * 0.7, H * 0.08, '#a6e38a', W * 0.18, 4);
+  drawTrees(groundY);
+  drawStation(groundY, true);
+  drawTrack(groundY);
+  drawTrain(groundY);
+  drawStation(groundY, false);
+  drawItems();
+  for (const p of parts) { ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(loop);
+}
+function arrive() {
+  state = 'stopped'; station.boarded = true;
+  chime(); setTimeout(() => say(station.name + ' えき、' + station.name + ' えき です'), 300);
+  setTimeout(() => { boarding = { animal: station.animal, p: 0 }; }, 1800);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

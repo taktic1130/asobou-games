@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff7eb6">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script>if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js");</script>
+<title>あそぼう！ゲーム</title>
+<style>
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; touch-action: none; }
+  body {
+    font-family: "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Meiryo", sans-serif;
+    background: linear-gradient(160deg, #ffe3f0 0%, #fff6c2 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #c2185b;
+  }
+  h1 { font-size: clamp(32px, 6vw, 64px); margin: 0 0 4vh; text-shadow: 3px 3px 0 #ffe066; letter-spacing: .1em; }
+  .grid { display: flex; gap: 4vw; flex-wrap: wrap; justify-content: center; padding: 0 16px; }
+  a.card {
+    width: clamp(180px, 26vw, 320px); aspect-ratio: 1 / 1.1;
+    border-radius: 40px; text-decoration: none; color: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: clamp(22px, 3vw, 38px); font-weight: bold;
+    box-shadow: 0 12px 0 rgba(0,0,0,.12); transition: transform .15s;
+    border: 6px solid #fff;
+  }
+  a.card:active { transform: scale(.94) translateY(6px); }
+  a.card .ico { font-size: clamp(80px, 11vw, 150px); line-height: 1.1; }
+  .pink { background: #ff7eb6; }
+  .yellow { background: #ffc93c; color: #8a4b00; }
+  .mix { background: linear-gradient(135deg, #ff7eb6, #ffc93c); }
+  .float { animation: bob 2.4s ease-in-out infinite; }
+  .float:nth-child(2) { animation-delay: .4s; }
+  .float:nth-child(3) { animation-delay: .8s; }
+  @keyframes bob { 50% { transform: translateY(-12px); } }
+  #fs { position: fixed; right: 16px; bottom: 16px; font-size: 18px; padding: 10px 16px; border-radius: 20px;
+        border: none; background: #fff; color: #c2185b; box-shadow: 0 3px 0 rgba(0,0,0,.1); }
+</style>
+</head>
+<body>
+  <h1>🌸 あそぼう！ 🌼</h1>
+  <div class="grid">
+    <a class="card pink float" href="shinkansen.html"><div class="ico">🚄</div>しんかんせん</a>
+    <a class="card yellow float" href="cooking.html"><div class="ico">🍳</div>おりょうり</a>
+    <a class="card mix float" href="fumikiri.html"><div class="ico">🚃</div>ふみきり</a>
+  </div>
+  <button id="fs" onclick="document.documentElement.requestFullscreen && document.documentElement.requestFullscreen()">⛶ おおきく</button>
+</body>
+</html>

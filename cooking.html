@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff7eb6">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script>if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js");</script>
+<title>おりょうり</title>
+<style>
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; touch-action: none; }
+  body { font-family: "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Meiryo", sans-serif;
+    background: repeating-linear-gradient(45deg, #fff6c2 0 40px, #fff0b0 40px 80px); color: #c2185b; }
+  #home { position: fixed; top: 14px; left: 14px; width: 72px; height: 72px; font-size: 36px; border-radius: 50%;
+    background: #ff7eb6; border: 6px solid #fff; box-shadow: 0 6px 0 rgba(0,0,0,.15); z-index: 10; padding: 0; }
+  #stars { position: fixed; top: 16px; right: 18px; background: #fff; color: #e0457b; border-radius: 30px;
+    padding: 8px 22px; font-size: clamp(24px, 3.2vw, 38px); font-weight: bold; box-shadow: 0 5px 0 rgba(0,0,0,.1); z-index: 10; }
+  /* おきゃくさん */
+  #counter { position: absolute; top: 0; left: 0; right: 0; height: 34vh; display: flex; align-items: flex-end; justify-content: center;
+    background: linear-gradient(#ffd6e8, #ffc2dc); border-bottom: 14px solid #ff8fc4; }
+  #guest { font-size: 22vh; line-height: 1; transform: translateY(14%); transition: transform .5s; }
+  #guest.out { transform: translate(-80vw, 14%); }
+  #guest.happy { animation: jump .4s 3; }
+  @keyframes jump { 50% { transform: translateY(-4%); } }
+  #bubble { position: absolute; left: calc(50% + 12vh); top: 3vh; background: #fff; border-radius: 30px; padding: 1vh 3vh;
+    font-size: 13vh; box-shadow: 0 6px 0 rgba(0,0,0,.08); transition: transform .3s; }
+  #bubble::after { content: ''; position: absolute; left: -26px; bottom: 26px; border: 18px solid transparent; border-right: 26px solid #fff; }
+  #bubble.hide { transform: scale(0); }
+  /* キッチン */
+  #pan { position: absolute; left: 50%; top: 44vh; width: 38vh; height: 24vh; transform: translateX(-50%); }
+  #panbody { position: absolute; inset: 0; border-radius: 0 0 50% 50% / 0 0 100% 100%; background: #ff7eb6;
+    box-shadow: inset 0 -12px 0 rgba(0,0,0,.12), 0 10px 0 rgba(0,0,0,.08); }
+  #panrim { position: absolute; left: -3%; right: -3%; top: -6%; height: 22%; border-radius: 50%; background: #ffb3d1; border: 6px solid #ff4f9a; }
+  #panin { position: absolute; left: 6%; right: 6%; top: -2%; height: 50%; display: flex; flex-wrap: wrap; justify-content: center;
+    align-items: center; font-size: 7vh; gap: 0 1vh; z-index: 2; }
+  #panin span { display: inline-block; animation: wob 1s ease-in-out infinite; }
+  #pan.stir #panin span { animation: spin .6s linear infinite; }
+  @keyframes wob { 50% { transform: rotate(10deg) translateY(-3px); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .handle { position: absolute; top: 4%; width: 18%; height: 14%; background: #ffd23f; border-radius: 20px; border: 5px solid #fff; }
+  .handle.l { left: -16%; } .handle.r { right: -16%; }
+  #steam { position: absolute; left: 50%; top: -60%; transform: translateX(-50%); font-size: 8vh; opacity: 0; transition: opacity .3s; }
+  #pan.stir #steam { opacity: 1; animation: rise 1s infinite; }
+  @keyframes rise { 0% { transform: translate(-50%, 10px); opacity: .9; } 100% { transform: translate(-50%, -30px); opacity: 0; } }
+  #meter { position: absolute; left: 50%; top: 74vh; transform: translateX(-50%); width: 40vh; height: 3vh; background: #fff; border-radius: 20px;
+    overflow: hidden; border: 4px solid #ff8fc4; display: none; }
+  #meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffd23f, #ff7eb6); transition: width .1s; }
+  #hint { position: absolute; left: 50%; top: 38vh; transform: translateX(-50%); font-size: clamp(26px, 4.5vh, 48px); font-weight: bold;
+    color: #ff4f9a; text-shadow: 3px 3px 0 #fff; white-space: nowrap; z-index: 5; }
+  #shelf { position: absolute; left: 0; right: 0; bottom: 3vh; display: flex; justify-content: center; gap: 3vw; }
+  .ing { width: 16vh; height: 16vh; font-size: 10vh; border-radius: 28px; border: 6px solid #fff; background: #ffd23f;
+    box-shadow: 0 8px 0 rgba(0,0,0,.12); padding: 0; line-height: 1; transition: opacity .3s, transform .15s; }
+  .ing:nth-child(even) { background: #ff9fca; }
+  .ing:active { transform: translateY(6px); box-shadow: 0 2px 0 rgba(0,0,0,.12); }
+  .ing.used { opacity: .25; pointer-events: none; }
+  .fly { position: fixed; font-size: 10vh; z-index: 20; pointer-events: none; transition: all .55s cubic-bezier(.3,-0.4,.6,1); }
+  #dish { position: absolute; left: 50%; top: 46vh; transform: translateX(-50%) scale(0); font-size: 22vh; z-index: 6; transition: transform .4s cubic-bezier(.3,1.6,.6,1); cursor: pointer; }
+  #dish.show { transform: translateX(-50%) scale(1); }
+  #dish.serve { transition: all .7s ease-in; transform: translate(-50%, -32vh) scale(.5); }
+  #dish::before { content: ''; position: absolute; left: -10%; right: -10%; bottom: 4%; height: 22%; background: #fff; border-radius: 50%; z-index: -1; box-shadow: 0 6px 0 rgba(0,0,0,.08); }
+  .heart { position: fixed; font-size: 8vh; pointer-events: none; z-index: 30; animation: up 1.5s ease-out forwards; }
+  @keyframes up { to { transform: translateY(-30vh) scale(1.5); opacity: 0; } }
+</style>
+</head>
+<body>
+<button id="home" onclick="location.href='index.html'">🏠</button>
+<div id="stars">🍽️ 0</div>
+<div id="counter"><div id="guest">🐰</div><div id="bubble" class="hide">🍛</div></div>
+<div id="hint"></div>
+<div id="pan"><div id="steam">♨️</div><div class="handle l"></div><div class="handle r"></div><div id="panbody"></div><div id="panrim"></div><div id="panin"></div></div>
+<div id="meter"><i></i></div>
+<div id="dish">🍛</div>
+<div id="shelf"></div>
+<script>
+// ---------- おと ----------
+let AC;
+function ac() { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); return AC; }
+function tone(freq, dur, type = 'sine', vol = .2, when = 0, slideTo) {
+  const a = ac(), t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .05);
+}
+const plop = () => { tone(300, .2, 'sine', .3, 0, 120); tone(700, .1, 'triangle', .1, .05); };
+const stirS = () => tone(200 + Math.random() * 300, .08, 'triangle', .08);
+const ta_da = () => [523, 659, 784, 1046].forEach((f, i) => tone(f, .35, 'triangle', .15, i * .12));
+const yum = () => [880, 1100, 1320].forEach((f, i) => tone(f, .2, 'sine', .15, i * .1));
+function say(t) {
+  try { const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; u.rate = .95; u.pitch = 1.35;
+    speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
+}
+
+// ---------- レシピ ----------
+const RECIPES = [
+  { dish: '🍛', name: 'カレー', ing: ['🥕', '🥔', '🧅', '🍖'] },
+  { dish: '🥞', name: 'ホットケーキ', ing: ['🥚', '🥛', '🧈', '🍓'] },
+  { dish: '🍕', name: 'ピザ', ing: ['🍅', '🧀', '🍄', '🫑'] },
+  { dish: '🍰', name: 'ケーキ', ing: ['🥚', '🥛', '🍓', '🍫'] },
+  { dish: '🍜', name: 'ラーメン', ing: ['🍥', '🥚', '🥬', '🍖'] },
+  { dish: '🍩', name: 'ドーナツ', ing: ['🥚', '🥛', '🍫', '🍬'] },
+];
+const GUESTS = ['🐰', '🐻', '🐼', '🐱', '🐶', '🐸', '🐷', '🐨', '🦊', '🐧', '🐹', '🐯'];
+const $ = id => document.getElementById(id);
+let phase = 'wait', recipe, added = 0, stir = 0, served = 0, lastIdx = -1;
+
+function newGuest() {
+  phase = 'wait';
+  const g = $('guest');
+  g.classList.add('out');
+  $('bubble').classList.add('hide');
+  $('dish').className = ''; $('panin').innerHTML = ''; $('shelf').innerHTML = ''; $('hint').textContent = '';
+  $('meter').style.display = 'none'; $('pan').style.display = '';
+  let i; do { i = (Math.random() * RECIPES.length) | 0; } while (i === lastIdx); lastIdx = i;
+  recipe = RECIPES[i];
+  setTimeout(() => {
+    g.style.transition = 'none'; g.textContent = GUESTS[(Math.random() * GUESTS.length) | 0];
+    g.style.transform = 'translate(80vw, 14%)'; g.offsetWidth;
+    g.style.transition = ''; g.style.transform = ''; g.classList.remove('out');
+    setTimeout(() => {
+      $('bubble').textContent = recipe.dish; $('bubble').classList.remove('hide');
+      say(recipe.name + '、 ください！');
+      buildShelf();
+    }, 600);
+  }, 550);
+}
+function buildShelf() {
+  phase = 'add'; added = 0;
+  $('hint').textContent = 'いれてね！';
+  recipe.ing.forEach(e => {
+    const b = document.createElement('button'); b.className = 'ing'; b.textContent = e;
+    b.addEventListener('pointerdown', ev => { ev.preventDefault(); addIng(b, e); });
+    $('shelf').appendChild(b);
+  });
+}
+function addIng(btn, e) {
+  if (phase !== 'add' || btn.classList.contains('used')) return;
+  ac(); btn.classList.add('used');
+  const r = btn.getBoundingClientRect(), p = $('pan').getBoundingClientRect();
+  const f = document.createElement('div'); f.className = 'fly'; f.textContent = e;
+  f.style.left = r.left + 'px'; f.style.top = r.top + 'px'; document.body.appendChild(f);
+  tone(600, .25, 'sine', .15, 0, 1200);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    f.style.left = (p.left + p.width / 2 - r.width / 2) + 'px'; f.style.top = (p.top - r.height * 0.2) + 'px'; f.style.transform = 'scale(.6)';
+  }));
+  setTimeout(() => {
+    f.remove(); plop();
+    const s = document.createElement('span'); s.textContent = e; s.style.animationDelay = (-Math.random()) + 's';
+    $('panin').appendChild(s);
+    added++;
+    if (added === recipe.ing.length) startStir();
+  }, 560);
+}
+function startStir() {
+  phase = 'stir'; stir = 0;
+  $('hint').textContent = '👆 まぜまぜ しよう！';
+  say('まぜまぜ しよう！');
+  $('meter').style.display = 'block'; $('meter').firstElementChild.style.width = '0';
+}
+// まぜる：こすっても タップしても OK
+let lastPt = null;
+const panEl = $('pan');
+function addStir(v) {
+  if (phase !== 'stir') return;
+  stir = Math.min(100, stir + v); $('meter').firstElementChild.style.width = stir + '%';
+  panEl.classList.add('stir'); clearTimeout(panEl._t); panEl._t = setTimeout(() => panEl.classList.remove('stir'), 300);
+  if (Math.random() < .5) stirS();
+  if (stir >= 100) finish();
+}
+document.addEventListener('pointerdown', e => {
+  ac();
+  if (phase === 'stir') { lastPt = [e.clientX, e.clientY]; addStir(12); }
+});
+document.addEventListener('pointermove', e => {
+  if (phase !== 'stir' || !lastPt || !e.buttons && e.pointerType === 'mouse') return;
+  const d = Math.hypot(e.clientX - lastPt[0], e.clientY - lastPt[1]); lastPt = [e.clientX, e.clientY];
+  addStir(d / 12);
+});
+document.addEventListener('pointerup', () => lastPt = null);
+
+function finish() {
+  phase = 'done'; panEl.classList.remove('stir');
+  $('meter').style.display = 'none'; $('hint').textContent = '';
+  tone(200, .3, 'sine', .3, 0, 900);
+  setTimeout(() => {
+    $('pan').style.display = 'none';
+    const d = $('dish'); d.textContent = recipe.dish; d.className = 'show';
+    ta_da(); say('できあがり！');
+    confetti(innerWidth / 2, innerHeight * 0.55);
+    $('hint').textContent = 'どうぞ してね 👆';
+    phase = 'serve';
+  }, 400);
+}
+$('dish').addEventListener('pointerdown', e => {
+  e.stopPropagation();
+  if (phase !== 'serve') return;
+  phase = 'eat'; $('hint').textContent = '';
+  $('dish').className = 'show serve';
+  setTimeout(() => {
+    $('dish').className = ''; $('bubble').textContent = '💖';
+    $('guest').classList.add('happy'); yum(); say('おいしい！ ありがとう！');
+    const g = $('guest').getBoundingClientRect();
+    for (let i = 0; i < 6; i++) setTimeout(() => heart(g.left + Math.random() * g.width, g.top + g.height * .3), i * 150);
+    served++; $('stars').textContent = '🍽️ ' + served;
+    setTimeout(() => { $('guest').classList.remove('happy'); newGuest(); }, 2600);
+  }, 700);
+});
+function heart(x, y, ch) {
+  const h = document.createElement('div'); h.className = 'heart'; h.textContent = ch || ['💖', '💛', '✨', '💕'][(Math.random() * 4) | 0];
+  h.style.left = x + 'px'; h.style.top = y + 'px'; document.body.appendChild(h); setTimeout(() => h.remove(), 1600);
+}
+function confetti(x, y) { for (let i = 0; i < 10; i++) heart(x + (Math.random() - .5) * 400, y + (Math.random() - .5) * 150, ['⭐', '✨', '🌸', '🌼'][i % 4]); }
+
+newGuest();
+</script>
+</body>
+</html>
