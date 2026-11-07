@@ -1,5 +1,5 @@
 // オフラインでも あそべるように ぜんぶ ほぞんしておく
-const CACHE = 'asobou-v1';
+const CACHE = 'asobou-v2';
 const FILES = ['./', './index.html', './shinkansen.html', './cooking.html', './fumikiri.html',
   './manifest.json', './icon-192.png', './icon-512.png'];
 
