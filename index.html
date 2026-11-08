@@ -24,12 +24,12 @@
     width: clamp(130px, min(26vw, 24vh), 320px); aspect-ratio: 1 / 1.1;
     border-radius: 40px; text-decoration: none; color: #fff;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-size: clamp(22px, 3vw, 38px); font-weight: bold;
+    font-size: clamp(16px, min(3.4vw, 3.2vh), 38px); font-weight: bold; white-space: nowrap;
     box-shadow: 0 12px 0 rgba(0,0,0,.12); transition: transform .15s;
     border: 6px solid #fff;
   }
   a.card:active { transform: scale(.94) translateY(6px); }
-  a.card .ico { font-size: clamp(80px, 11vw, 150px); line-height: 1.1; }
+  a.card .ico { font-size: clamp(56px, min(11vw, 12vh), 150px); line-height: 1.1; }
   .pink { background: #ff7eb6; }
   .yellow { background: #ffc93c; color: #8a4b00; }
   .mix { background: linear-gradient(135deg, #ff7eb6, #ffc93c); }
@@ -49,5 +49,6 @@
     <a class="card mix float" href="fumikiri.html"><div class="ico">🚃</div>ふみきり</a>
   </div>
   <button id="fs" onclick="document.documentElement.requestFullscreen && document.documentElement.requestFullscreen()">⛶ おおきく</button>
+  <script>if (window.AndroidTTS) document.getElementById('fs').style.display = 'none';</script>
 </body>
 </html>
