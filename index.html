@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>テスト中</title>
+<style>
+  :root { --pink: #ff7eb6; --ink: #c2185b; --bg1: #ffe3f0; --bg2: #fff6c2; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Meiryo", sans-serif;
+    background: linear-gradient(160deg, var(--bg1), var(--bg2));
+    color: var(--ink); display: flex; align-items: center; justify-content: center; text-align: center; padding: 16px; box-sizing: border-box;
+  }
+  .box { background: #fff; border-radius: 32px; padding: 40px 32px; box-shadow: 0 10px 0 rgba(0,0,0,.08); border: 6px solid var(--pink); max-width: 480px; }
+  .ico { font-size: 72px; line-height: 1; }
+  h1 { font-size: clamp(28px, 7vw, 44px); margin: 16px 0 8px; }
+  p { font-size: 18px; margin: 0; color: #8a4b00; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="ico">🚧</div>
+    <h1>テスト中です</h1>
+    <p>ただいま じゅんびちゅう。<br>もうすこし まってね。</p>
+  </div>
+<script>
+  // 以前ゲームを保存した端末から、オフライン用のデータを消す
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
