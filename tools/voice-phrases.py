@@ -43,7 +43,7 @@ def add(t):
 for f in sorted(ROOT.glob('*.html')) + [ROOT / 'common.js']:
     s = f.read_text(encoding='utf-8')
     for line in s.splitlines():
-        if 'say(' in line or "say: '" in line:
+        if 'say(' in line or 'Say(' in line or "say: '" in line:
             for t in strs(line):
                 if t and not t[0] in ' 、' and not t.endswith(' ') and JP.search(t)                         and not any(ord(ch) > 0xFFFF for ch in t) and not t.startswith('りょう'):
                     add(t)
