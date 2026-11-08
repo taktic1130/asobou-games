@@ -89,13 +89,36 @@ function drawTop(c, k, x, y, s, v = 0) {
   const shine = (ex, ey, r) => ell(ex, ey, r, r * .6, 'rgba(255,255,255,.65)', -.5);
   ell(x, y, s * .4, s * .12, 'rgba(80,30,50,.18)');
   if (k === 'ichigo') {
-    c.fillStyle = '#e8344e'; c.beginPath(); c.moveTo(x, y);
-    c.bezierCurveTo(x - s * .55, y - s * .15, x - s * .48, y - s * .82, x, y - s * .78);
-    c.bezierCurveTo(x + s * .48, y - s * .82, x + s * .55, y - s * .15, x, y); c.fill();
-    for (const [a, b] of [[-.2, .3], [.05, .22], [.22, .38], [-.12, .52], [.14, .58], [-.24, .66], [0, .45], [.26, .62]]) ell(x + a * s, y - b * s, s * .03, s * .045, '#ffe680');
-    c.fillStyle = '#4caf50';
-    for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i - 2) * .55; ell(x + Math.cos(a) * s * .14, y - s * .8 + Math.sin(a) * s * .06 + s * .03, s * .14, s * .055, '#4caf50', a); }
-    shine(x - s * .17, y - s * .55, s * .08);
+    // まるい あたま と したの とんがり（へたなし）
+    // さかさまの さんかく（かどは まるく）
+    const body = () => { c.beginPath(); c.moveTo(x - s * .05, y - s * .03);
+      c.quadraticCurveTo(x, y + s * .02, x + s * .05, y - s * .03);
+      c.quadraticCurveTo(x + s * .28, y - s * .38, x + s * .44, y - s * .66);
+      c.quadraticCurveTo(x + s * .52, y - s * .84, x + s * .3, y - s * .9);
+      c.quadraticCurveTo(x, y - s * .97, x - s * .3, y - s * .9);
+      c.quadraticCurveTo(x - s * .52, y - s * .84, x - s * .44, y - s * .66);
+      c.quadraticCurveTo(x - s * .28, y - s * .38, x - s * .05, y - s * .03); c.closePath(); };
+    c.save(); body(); c.fillStyle = '#e3191f'; c.fill(); c.clip();
+    // みぎしたの こい かげ
+    const dk = c.createRadialGradient(x + s * .28, y - s * .2, s * .05, x + s * .28, y - s * .2, s * .55);
+    dk.addColorStop(0, 'rgba(140,6,14,.95)'); dk.addColorStop(.55, 'rgba(160,8,18,.7)'); dk.addColorStop(1, 'rgba(170,10,20,0)');
+    c.fillStyle = dk; c.fillRect(x - s, y - s, s * 2, s * 1.1);
+    // ひだりうえの あかるい ところ
+    const lt = c.createRadialGradient(x - s * .22, y - s * .68, s * .02, x - s * .22, y - s * .68, s * .38);
+    lt.addColorStop(0, 'rgba(255,120,100,.75)'); lt.addColorStop(1, 'rgba(255,120,100,0)');
+    c.fillStyle = lt; c.fillRect(x - s, y - s, s * 2, s * 1.1);
+    c.strokeStyle = 'rgba(255,170,150,.85)'; c.lineCap = 'round';
+    c.lineWidth = s * .07; c.beginPath(); c.moveTo(x - s * .36, y - s * .5); c.quadraticCurveTo(x - s * .38, y - s * .7, x - s * .24, y - s * .82); c.stroke();
+    c.lineWidth = s * .05; c.beginPath(); c.moveTo(x - s * .12, y - s * .86); c.lineTo(x - s * .02, y - s * .88); c.stroke();
+    // つぶつぶ
+    for (let r = 0; r < 6; r++) for (let q = 0; q < 5; q++) {
+      const j = Math.sin(r * 12.9 + q * 7.7) * s * .03;
+      const sx = x - s * .4 + q * s * .19 + (r % 2) * s * .095 + j, sy = y - s * .84 + r * s * .15 - j;
+      c.fillStyle = 'rgba(120,0,0,.35)'; c.beginPath(); c.ellipse(sx + s * .008, sy + s * .012, s * .024, s * .034, .3, 0, 7); c.fill();
+      c.fillStyle = '#ffe04a'; c.beginPath(); c.ellipse(sx, sy, s * .02, s * .03, .3, 0, 7); c.fill();
+    }
+    c.restore();
+    body(); c.strokeStyle = 'rgba(140,8,14,.45)'; c.lineWidth = Math.max(1, s * .02); c.stroke();
   } else if (k === 'whip') {
     for (let i = 0; i < 4; i++) {
       const yy = y - s * (.1 + i * .17), rx = s * (.42 - i * .09), ry = s * (.15 - i * .02);
@@ -535,11 +558,11 @@ function drawCakeBody(g) {
   ctx.save(); ctx.clip(side);
   ctx.drawImage(creamC, 0, 0, W, H);
   const sx = ctx.createLinearGradient(g.cx - g.R * 1.05, 0, g.cx + g.R * 1.05, 0);
-  sx.addColorStop(0, 'rgba(60,20,40,.28)'); sx.addColorStop(.3, 'rgba(60,20,40,.06)'); sx.addColorStop(.45, 'rgba(255,255,255,.12)');
-  sx.addColorStop(.7, 'rgba(60,20,40,.08)'); sx.addColorStop(1, 'rgba(60,20,40,.32)');
+  sx.addColorStop(0, 'rgba(110,50,30,.28)'); sx.addColorStop(.3, 'rgba(110,50,30,.06)'); sx.addColorStop(.45, 'rgba(255,255,255,.12)');
+  sx.addColorStop(.7, 'rgba(110,50,30,.08)'); sx.addColorStop(1, 'rgba(110,50,30,.32)');
   ctx.fillStyle = sx; ctx.fillRect(g.cx - g.R * 1.3, g.ty - g.R, g.R * 2.6, g.R * 2 + g.D);
   const sy = ctx.createLinearGradient(0, g.ty, 0, g.ty + g.R * .55 + g.D);
-  sy.addColorStop(0, 'rgba(60,20,40,0)'); sy.addColorStop(1, 'rgba(60,20,40,.18)');
+  sy.addColorStop(0, 'rgba(110,50,30,0)'); sy.addColorStop(1, 'rgba(110,50,30,.18)');
   ctx.fillStyle = sy; ctx.fillRect(g.cx - g.R * 1.3, g.ty - g.R, g.R * 2.6, g.R * 2 + g.D);
   ctx.restore();
   // うえの めん（あかるく）
@@ -552,7 +575,7 @@ function drawCakeBody(g) {
   ctx.restore();
   // ふちどり（うえと よこの さかいめ）
   ctx.lineJoin = 'round';
-  ctx.strokeStyle = 'rgba(60,20,40,.16)'; ctx.lineWidth = U * 1.1; ctx.stroke(TOP);
+  ctx.strokeStyle = 'rgba(110,50,30,.16)'; ctx.lineWidth = U * 1.1; ctx.stroke(TOP);
   ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = U * .45; ctx.stroke(TOP);
   // つぶつぶ・トッピング（おくから じゅんに）
   const items = tops.map(t => ({ ...t, kind: 't' })).concat(candles.map(c => ({ ...c, kind: 'c' })));

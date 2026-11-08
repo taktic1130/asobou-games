@@ -25,6 +25,7 @@ javac -nowarn -source 1.8 -target 1.8 -Xlint:-options -bootclasspath "$(cygpath 
   -d "$(cygpath -w "$B/classes")" "$(cygpath -w "$ROOT/android/src/jp/asobou/games/MainActivity.java")"
 cmd //c "$(cygpath -w "$BT/d8.bat")" --min-api 22 --lib "$(cygpath -w "$JAR")" --output "$(cygpath -w "$B/dex")" \
   $(cd "$B/classes" && find . -name '*.class' | sed "s#^\./#$(cygpath -w "$B/classes" | sed 's#\\#\\\\#g')\\\\#")
+mkdir -p "$B/assets/www/voice" && cp "$ROOT"/voice/*.mp3 "$ROOT/voice/list.js" "$B/assets/www/voice/"
 (cd "$B/dex" && jar uf0M "$(cygpath -w "$B/base.apk")" classes.dex)
 # ゲームの ファイル（aapt2 -A だと Windows で パスが「\」に なるので jar で いれる）
 (cd "$B" && jar uf0M "$(cygpath -w "$B/base.apk")" assets)

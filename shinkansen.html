@@ -393,7 +393,7 @@ function checkBoardDone() {
   if (phase !== 'board' || station.wait.some(w => !w.going) || movers.some(m => m.kind === 'on')) return;
   phase = 'close'; hint('');
   setTimeout(() => {
-    A.noise(.6, .08, 0, 900); A.say(A.praise() + ' ドアが しまります');
+    A.noise(.6, .08, 0, 900); A.say([A.praise(), 'ドアが しまります']);
     setTimeout(() => { state = 'stopped'; phase = null; goBtn.classList.remove('hide'); }, 1300);
   }, 500);
 }

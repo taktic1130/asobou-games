@@ -50,14 +50,43 @@
   };
 
   // ---------- こえ ----------
-  let lastSay = 0;
-  function say(t) {
-    lastSay = Date.now();
+  // voice/ に よみあげ ずみの MP3 が あれば それを ならす（Fire タブレットには にほんごの よみあげが ないため）
+  // ファイルの なまえは ことばの FNV-1a ハッシュ（tools/voice-phrases.py と おなじ）
+  function voiceId(t) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+  (function loadList() {
+    if (window.ASOBOU_VOICE) return;
+    const s = document.createElement('script'); s.src = 'voice/list.js'; s.async = true;
+    (document.head || document.documentElement).appendChild(s);
+  })();
+  const hasVoice = t => !!(window.ASOBOU_VOICE && window.ASOBOU_VOICE.has(voiceId(t)));
+  let audio = null, queue = [], lastSay = 0;
+  function playNext() {
+    const t = queue.shift(); if (t === undefined) return;
+    audio = new Audio('voice/' + voiceId(t) + '.mp3');
+    audio.onended = playNext; audio.onerror = playNext;
+    const p = audio.play(); if (p && p.catch) p.catch(() => {});
+  }
+  function stopVoice() {
+    queue = []; if (audio) { audio.onended = audio.onerror = null; try { audio.pause(); } catch (e) {} audio = null; }
+    try { speechSynthesis.cancel(); } catch (e) {}
+  }
+  function tts(t) {
     if (window.AndroidTTS) { try { AndroidTTS.speak(t); } catch (e) {} return; }
     try {
       const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; u.rate = .95; u.pitch = 1.3;
-      speechSynthesis.cancel(); speechSynthesis.speak(u);
+      speechSynthesis.speak(u);
     } catch (e) {}
+  }
+  function say(t) {
+    lastSay = Date.now();
+    const parts = (Array.isArray(t) ? t : [t]).filter(Boolean);
+    stopVoice();
+    if (parts.length && parts.every(hasVoice)) { queue = parts.slice(); playNext(); return; }
+    tts(parts.join(' '));
   }
   const PRAISE = ['すごい！', 'じょうず！', 'やったね！', 'ばっちり！', 'すてき！', 'かんぺき！'];
   const praise = () => PRAISE[(Math.random() * PRAISE.length) | 0];
@@ -175,6 +204,6 @@
   addEventListener('pointerdown', () => ac(), { capture: true, passive: true });
 
   window.Asobou = { ac, tone, noise, S, say, praise, award, getStickers, STICKERS, fx, confetti, pick, ANIMALS, ANIMAL_NAME,
-    TRAIN, loadMyTrain, saveMyTrain,
+    TRAIN, loadMyTrain, saveMyTrain, hasVoice, voiceId,
     get stickerOpen() { return stickerOpen; } };
 })();
