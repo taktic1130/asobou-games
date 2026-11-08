@@ -18,27 +18,34 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     color: #c2185b;
   }
-  h1 { font-size: clamp(32px, 6vw, 64px); margin: 0 0 4vh; text-shadow: 3px 3px 0 #ffe066; letter-spacing: .1em; }
-  .grid { display: flex; gap: 4vw; flex-wrap: wrap; justify-content: center; padding: 0 16px; }
+  h1 { font-size: clamp(28px, min(5.5vw, 7vh), 60px); margin: 0 0 3vh; text-shadow: 3px 3px 0 #ffe066; letter-spacing: .1em; }
+  .grid { display: grid; grid-template-columns: repeat(3, auto); gap: clamp(10px, min(3vw, 3.5vh), 36px); justify-content: center; padding: 0 16px; }
+  @media (max-aspect-ratio: 1/1) { .grid { grid-template-columns: repeat(2, auto); } }
   a.card {
-    width: clamp(130px, min(26vw, 24vh), 320px); aspect-ratio: 1 / 1.1;
-    border-radius: 40px; text-decoration: none; color: #fff;
+    width: clamp(100px, min(23vw, 27vh), 260px); aspect-ratio: 1 / 0.95;
+    border-radius: 36px; text-decoration: none; color: #fff;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-size: clamp(16px, min(3.4vw, 3.2vh), 38px); font-weight: bold; white-space: nowrap;
-    box-shadow: 0 12px 0 rgba(0,0,0,.12); transition: transform .15s;
+    font-size: clamp(14px, min(2.8vw, 3vh), 32px); font-weight: bold; white-space: nowrap;
+    box-shadow: 0 10px 0 rgba(0,0,0,.12); transition: transform .15s;
     border: 6px solid #fff;
   }
+  @media (max-aspect-ratio: 1/1) { a.card { width: clamp(100px, min(38vw, 20vh), 260px); font-size: clamp(14px, min(4.4vw, 2.6vh), 30px); } }
   a.card:active { transform: scale(.94) translateY(6px); }
-  a.card .ico { font-size: clamp(56px, min(11vw, 12vh), 150px); line-height: 1.1; }
+  a.card .ico { font-size: clamp(44px, min(9.5vw, 12vh), 120px); line-height: 1.1; }
   .pink { background: #ff7eb6; }
   .yellow { background: #ffc93c; color: #8a4b00; }
   .mix { background: linear-gradient(135deg, #ff7eb6, #ffc93c); }
+  .mint { background: #6fcf97; }
+  .sky { background: #6fb8ff; }
+  .peach { background: #ff9f80; }
   .float { animation: bob 2.4s ease-in-out infinite; }
-  .float:nth-child(2) { animation-delay: .4s; }
-  .float:nth-child(3) { animation-delay: .8s; }
-  @keyframes bob { 50% { transform: translateY(-12px); } }
-  #fs { position: fixed; right: 16px; bottom: 16px; font-size: 18px; padding: 10px 16px; border-radius: 20px;
-        border: none; background: #fff; color: #c2185b; box-shadow: 0 3px 0 rgba(0,0,0,.1); }
+  .float:nth-child(2) { animation-delay: .3s; } .float:nth-child(3) { animation-delay: .6s; }
+  .float:nth-child(4) { animation-delay: .9s; } .float:nth-child(5) { animation-delay: 1.2s; } .float:nth-child(6) { animation-delay: 1.5s; }
+  @keyframes bob { 50% { transform: translateY(-10px); } }
+  .corner { position: fixed; bottom: 16px; font-size: 20px; padding: 10px 18px; border-radius: 22px; border: none; background: #fff; color: #c2185b;
+    box-shadow: 0 4px 0 rgba(0,0,0,.1); font-family: inherit; font-weight: bold; text-decoration: none; }
+  #book { left: 16px; font-size: clamp(18px, 3vh, 26px); background: #fff3b0; color: #8a4b00; }
+  #fs { right: 16px; }
 </style>
 </head>
 <body>
@@ -47,8 +54,12 @@
     <a class="card pink float" href="shinkansen.html"><div class="ico">🚄</div>しんかんせん</a>
     <a class="card yellow float" href="cooking.html"><div class="ico">🍳</div>おりょうり</a>
     <a class="card mix float" href="fumikiri.html"><div class="ico">🚃</div>ふみきり</a>
+    <a class="card mint float" href="senro.html"><div class="ico">🛤️</div>せんろを かこう</a>
+    <a class="card sky float" href="arai.html"><div class="ico">🧽</div>でんしゃ あらい</a>
+    <a class="card peach float" href="cake.html"><div class="ico">🎂</div>ケーキやさん</a>
   </div>
-  <button id="fs" onclick="document.documentElement.requestFullscreen && document.documentElement.requestFullscreen()">⛶ おおきく</button>
+  <a class="corner" id="book" href="stickers.html">📒 シールちょう</a>
+  <button class="corner" id="fs" onclick="document.documentElement.requestFullscreen && document.documentElement.requestFullscreen()">⛶ おおきく</button>
   <script>if (window.AndroidTTS) document.getElementById('fs').style.display = 'none';</script>
 </body>
 </html>

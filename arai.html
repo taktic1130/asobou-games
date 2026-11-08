@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff7eb6">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script>if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js");</script>
+<title>でんしゃ あらい</title>
+<style>
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; touch-action: none; background: #ffe3f0;
+    font-family: "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Meiryo", sans-serif; }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; }
+  button { font-family: inherit; cursor: pointer; }
+  #home { position: fixed; top: 14px; left: 14px; width: 72px; height: 72px; font-size: 36px; border-radius: 50%; padding: 0;
+    background: #ff7eb6; border: 6px solid #fff; box-shadow: 0 6px 0 rgba(0,0,0,.15); z-index: 5; }
+  #steps { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 5; }
+  #steps div { width: clamp(48px, 7vh, 70px); height: clamp(48px, 7vh, 70px); border-radius: 50%; background: #fff; display: flex;
+    align-items: center; justify-content: center; font-size: clamp(26px, 4vh, 40px); opacity: .4; border: 4px solid #fff; box-shadow: 0 4px 0 rgba(0,0,0,.08); }
+  #steps div.now { opacity: 1; border-color: #ff7eb6; transform: scale(1.15); }
+  #steps div.done { opacity: 1; background: #fff3b0; }
+  #meter { position: fixed; top: calc(16px + clamp(48px, 7vh, 70px) + 16px); left: 50%; transform: translateX(-50%); width: min(50vw, 420px); height: 22px;
+    background: #fff; border-radius: 20px; border: 4px solid #ff8fc4; overflow: hidden; z-index: 5; }
+  #meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7fdcff, #ff7eb6); transition: width .15s; }
+  #meter.hide { opacity: 0; }
+  #say { position: fixed; background: #fff; border-radius: 26px; padding: 10px 22px; font-size: clamp(20px, 3.4vh, 34px); font-weight: bold;
+    color: #e0457b; box-shadow: 0 5px 0 rgba(0,0,0,.1); white-space: nowrap; transform: translateX(-50%) scale(0); transition: transform .3s cubic-bezier(.3,1.6,.6,1); z-index: 4; pointer-events: none; }
+  #say.show { transform: translateX(-50%) scale(1); }
+  #bar { position: fixed; left: 0; right: 0; bottom: 2.5vh; display: flex; justify-content: center; gap: 1.6vw; z-index: 5; }
+  #bar button { width: clamp(64px, 11vh, 110px); height: clamp(64px, 11vh, 110px); border-radius: 26px; border: 5px solid #fff; background: #fff3b0;
+    font-size: clamp(34px, 6.5vh, 64px); padding: 0; box-shadow: 0 6px 0 rgba(0,0,0,.12); }
+  #bar button.sel { background: #ff9fca; transform: translateY(-8px); }
+  #bar button.go { width: auto; padding: 0 28px; background: #ff4f9a; color: #fff; font-size: clamp(26px, 4.6vh, 44px); font-weight: bold; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.06); } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button id="home" onclick="location.href='index.html'">🏠</button>
+<div id="steps"><div>🧽</div><div>🚿</div><div>✨</div><div>🎀</div></div>
+<div id="meter"><i></i></div>
+<div id="say"></div>
+<div id="bar"></div>
+<script src="common.js"></script>
+<script>
+const A = Asobou, S = A.S, T = A.TRAIN, $ = id => document.getElementById(id);
+const cv = $('c'), ctx = cv.getContext('2d');
+const mudC = document.createElement('canvas'), mud = mudC.getContext('2d');
+const foamC = document.createElement('canvas'), foam = foamC.getContext('2d');
+const test = document.createElement('canvas').getContext('2d');
+let W, H, U, DPR;
+
+const LOOKS = [
+  { shape: 'long', body: '#ff8fc4', stripe: '#ffd23f', belly: '#ffffff' },
+  { shape: 'round', body: '#ffd23f', stripe: '#ff7eb6', belly: '#ffffff' },
+  { shape: 'kamo', body: '#f4f6ff', stripe: '#2f74e0', belly: '#f4f6ff' },
+  { shape: 'flat', body: '#7ccf9b', stripe: '#ffffff', belly: '#7ccf9b' },
+  { shape: 'long', body: '#ffb35c', stripe: '#ffffff', belly: '#fff3b0' },
+];
+const STAMPS = ['💖', '⭐', '🌸', '🎀', '🌈', '🍓'];
+let look, g, P, round = 0, step = 'come', cells = [], mudTot = 0, mudLeft = 0, foamSet = new Set(), foamCleared = 0, shineD = 0;
+let parts = [], stamps = [], time = 0, tx = 0, down = null, stampSel = 0, happy = 0, gloss = -1;
+
+function geo(xoff = 0) {
+  const sh = look.shape, k = T.NOSE[sh], TL = Math.min(W * .86, H * 1.45), L = TL / (1 + k), N = L * k, Ht = Math.min(L * .38, H * .3);
+  return { x: (W - TL) / 2 + xoff, y: H * .5 - Ht * .55, L, N, Ht, TL };
+}
+function resize() {
+  DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; U = Math.min(W, H) / 100;
+  for (const c of [cv, mudC, foamC]) { c.width = W * DPR; c.height = H * DPR; }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); mud.setTransform(DPR, 0, 0, DPR, 0, 0); foam.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (look) { newDirt(); if (step === 'rinse' || step === 'shine') setStep('mud'); }
+}
+function bodyPath(gg) { const p = new Path2D(); T.body(p, gg.x, gg.y, gg.L, gg.Ht, gg.N, look.shape); return p; }
+function inBody(x, y) { return test.isPointInPath(P, x, y); }
+
+// ---------- よごす ----------
+function newDirt() {
+  g = geo(); P = bodyPath(g);
+  mud.clearRect(0, 0, W, H); foam.clearRect(0, 0, W, H);
+  mud.save(); mud.clip(P);
+  const blobs = [];
+  for (let i = 0; i < 30; i++) {
+    const bx = g.x + Math.random() * g.TL, by = g.y + Math.random() * g.Ht, r = U * (4 + Math.random() * 6);
+    blobs.push([bx, by, r]);
+    mud.fillStyle = ['#8a6242', '#9c7350', '#7a5236'][i % 3];
+    mud.beginPath(); mud.arc(bx, by, r, 0, 7);
+    for (let j = 0; j < 5; j++) { const a = Math.random() * 7; mud.moveTo(bx + Math.cos(a) * r, by + Math.sin(a) * r); mud.arc(bx + Math.cos(a) * r, by + Math.sin(a) * r, r * (.3 + Math.random() * .3), 0, 7); }
+    mud.fill();
+  }
+  mud.font = `${U * 5}px sans-serif`; mud.textAlign = 'center'; mud.textBaseline = 'middle';
+  for (let i = 0; i < 5; i++) mud.fillText(A.pick(['🍂', '🍃', '🍂']), g.x + Math.random() * g.TL, g.y + Math.random() * g.Ht);
+  mud.restore();
+  // マス目
+  cells = []; const s = U * 2.5;
+  for (let y = g.y; y < g.y + g.Ht; y += s) for (let x = g.x; x < g.x + g.TL; x += s) {
+    const cx = x + s / 2, cy = y + s / 2;
+    if (!inBody(cx, cy)) continue;
+    if (blobs.some(([bx, by, r]) => Math.hypot(cx - bx, cy - by) < r * 1.2)) cells.push({ x: cx, y: cy, mud: true });
+  }
+  mudTot = mudLeft = cells.length; foamSet = new Set(); foamCleared = 0; shineD = 0; stamps = []; happy = 0; gloss = -1;
+}
+
+// ---------- すすめかた ----------
+function setStep(s) {
+  step = s; down = null;
+  const order = ['mud', 'rinse', 'shine', 'stamp'], i = order.indexOf(s);
+  [...$('steps').children].forEach((d, k) => d.className = k < i ? 'done' : k === i ? 'now' : '');
+  $('meter').classList.toggle('hide', !(s === 'mud' || s === 'rinse' || s === 'shine'));
+  meter(0);
+  const bar = $('bar'); bar.innerHTML = '';
+  if (s === 'stamp') {
+    STAMPS.forEach((e, k) => { const b = document.createElement('button'); b.textContent = e; if (k === stampSel) b.className = 'sel';
+      b.addEventListener('pointerdown', ev => { ev.stopPropagation(); stampSel = k; [...bar.children].forEach((c, j) => c.classList.toggle('sel', j === k)); S.tap(); });
+      bar.appendChild(b); });
+    const go = document.createElement('button'); go.className = 'go'; go.textContent = 'しゅっぱつ！';
+    go.addEventListener('pointerdown', ev => { ev.stopPropagation(); depart(); }); bar.appendChild(go);
+  }
+}
+function meter(v) { $('meter').firstElementChild.style.width = Math.round(v * 100) + '%'; }
+function bubble(t, ms = 2600) {
+  const s = $('say'); s.textContent = t; s.style.left = (g.x + g.TL * .6) + 'px'; s.style.top = Math.max(110, g.y - U * 14) + 'px';
+  s.classList.add('show'); clearTimeout(s._t); s._t = setTimeout(() => s.classList.remove('show'), ms);
+}
+function arrive() {
+  look = LOOKS[round % LOOKS.length]; newDirt(); step = 'come'; tx = -W; setStep('come');
+  [...$('steps').children].forEach(d => d.className = '');
+  S.whistle();
+}
+function startWash() {
+  setStep('mud'); bubble('えーん、 どろんこ だよ〜');
+  A.say('どろんこに なっちゃった。 スポンジで ごしごし してね');
+}
+function doneMud() {
+  mud.clearRect(0, 0, W, H); S.sparkle();
+  if (foamSet.size < 8) { doneRinse(); return; }
+  setStep('rinse'); bubble('あわあわ〜'); A.say('あわあわ！ つぎは シャワーで ながそう');
+}
+function doneRinse() {
+  foam.clearRect(0, 0, W, H); S.sparkle();
+  setStep('shine'); bubble('きもちいい〜'); A.say('きれいに なった！ さいごに ふきふき して ぴかぴかに しよう');
+}
+function doneShine() {
+  happy = 1; gloss = 0; setStep('stamp');
+  S.fanfare(); A.say('ぴかぴか！ ありがとう！'); bubble('ぴかぴか！ ありがとう！💖', 3000);
+  for (let i = 0; i < 30; i++) setTimeout(() => sparkle(g.x + Math.random() * g.TL, g.y + Math.random() * g.Ht), i * 40);
+  setTimeout(() => A.award(() => setTimeout(() => A.say('シールを はって あげよう'), 300)), 1800);
+}
+function depart() {
+  if (step !== 'stamp') return;
+  step = 'go'; $('bar').innerHTML = ''; S.horn(); A.say('いってきまーす！'); bubble('いってきまーす！👋', 2000);
+  round++;
+}
+
+// ---------- こする ----------
+function strokeTo(x, y) {
+  const px = down ? down.x : x, py = down ? down.y : y, d = Math.hypot(x - px, y - py), n = Math.max(1, Math.ceil(d / (U * 1.5)));
+  for (let i = 1; i <= n; i++) rubAt(px + (x - px) * i / n, py + (y - py) * i / n);
+  if (step === 'shine') { shineD += d; meter(Math.min(1, shineD / (W * 2.2))); if (shineD >= W * 2.2) doneShine(); }
+  down = { x, y };
+}
+function rubAt(x, y) {
+  if (step === 'mud') {
+    const R = U * 6.5;
+    mud.save(); mud.globalCompositeOperation = 'destination-out'; mud.beginPath(); mud.arc(x, y, R, 0, 7); mud.fill(); mud.restore();
+    foam.save(); foam.clip(P);
+    for (let k = 0; k < 2; k++) {
+      const bx = x + (Math.random() - .5) * R * 1.6, by = y + (Math.random() - .5) * R * 1.6, br = U * (1 + Math.random() * 2.2);
+      foam.fillStyle = 'rgba(255,255,255,.95)'; foam.beginPath(); foam.arc(bx, by, br, 0, 7); foam.fill();
+      foam.strokeStyle = 'rgba(160,200,255,.7)'; foam.lineWidth = 1.5; foam.stroke();
+      foam.fillStyle = 'rgba(255,190,230,.6)'; foam.beginPath(); foam.arc(bx - br * .3, by - br * .3, br * .25, 0, 7); foam.fill();
+    }
+    foam.restore();
+    cells.forEach((c, i) => { if (Math.hypot(c.x - x, c.y - y) < R) { if (c.mud) { c.mud = false; mudLeft--; } foamSet.add(i); } });
+    meter(1 - mudLeft / Math.max(1, mudTot));
+    if (Math.random() < .3) A.noise(.08, .05, 0, 1800);
+    if (mudLeft <= mudTot * .08) doneMud();
+  } else if (step === 'rinse') {
+    const R = U * 7.5;
+    foam.save(); foam.globalCompositeOperation = 'destination-out'; foam.beginPath(); foam.arc(x, y, R, 0, 7); foam.fill(); foam.restore();
+    for (const i of [...foamSet]) { const c = cells[i]; if (Math.hypot(c.x - x, c.y - y) < R) { foamSet.delete(i); foamCleared++; } }
+    meter(foamCleared / Math.max(1, foamCleared + foamSet.size));
+    if (Math.random() < .5) parts.push({ x: x + (Math.random() - .5) * U * 4, y: y - U * 4, vx: (Math.random() - .5) * 60, vy: 200 + Math.random() * 200, life: 1, c: '#7fd0ff', r: 2 + Math.random() * 4 });
+    if (foamSet.size <= (foamCleared + foamSet.size) * .08) doneRinse();
+  } else if (step === 'shine') {
+    if (Math.random() < .25) sparkle(x + (Math.random() - .5) * U * 8, y + (Math.random() - .5) * U * 8);
+  } else if (step === 'stamp') { /* タップで はる */ }
+}
+let waterT = 0;
+function sparkle(x, y) { parts.push({ x, y, vx: 0, vy: -30, life: 1, star: true, r: U * (1.5 + Math.random() * 2) }); }
+cv.addEventListener('pointerdown', e => {
+  if (A.stickerOpen) return;
+  down = { x: e.clientX, y: e.clientY };
+  if (step === 'stamp') {
+    if (inBody(e.clientX, e.clientY) && stamps.length < 20) { stamps.push({ e: STAMPS[stampSel], x: e.clientX - g.x, y: e.clientY - g.y, t: 0 }); S.pop(); }
+    else S.tap();
+    return;
+  }
+  strokeTo(e.clientX, e.clientY);
+});
+cv.addEventListener('pointermove', e => {
+  if (!down || A.stickerOpen) return;
+  if (step === 'mud' || step === 'rinse' || step === 'shine') strokeTo(e.clientX, e.clientY);
+});
+const up = () => { down = null; };
+cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('pointerleave', up);
+
+// ---------- かく ----------
+function drawScene() {
+  // しゃこ
+  ctx.fillStyle = '#ffe3f0'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#ffd6e8'; for (let x = 0; x < W; x += U * 12) ctx.fillRect(x, 0, U * 6, H * .78);
+  ctx.fillStyle = '#ffc93c'; ctx.fillRect(0, H * .78, W, H * .22);
+  ctx.fillStyle = '#e8b030'; for (let x = 0; x < W; x += U * 10) ctx.fillRect(x, H * .78, U * 1, H * .22);
+  // あらう きかい（アーチ）
+  ctx.fillStyle = '#7fd0ff'; ctx.fillRect(W * .04, H * .12, U * 3, H * .66); ctx.fillRect(W * .96 - U * 3, H * .12, U * 3, H * .66);
+  ctx.fillRect(W * .04, H * .12, W * .92, U * 3);
+  ctx.fillStyle = '#fff'; ctx.font = `bold ${U * 3.4}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // レール
+  const ry = g.y + g.Ht + g.L * .07;
+  ctx.fillStyle = '#9e8e80'; ctx.fillRect(0, ry, W, U * 1.6);
+}
+function drawTrain(xoff) {
+  const gg = geo(xoff), { x, y, L, N, Ht } = gg;
+  ctx.save();
+  // しゃりん
+  ctx.fillStyle = '#5d5470';
+  for (const wx of [.1, .25, .62, .77]) { ctx.beginPath(); ctx.arc(x + gg.TL * wx, y + Ht + L * .035, L * .04, 0, 7); ctx.fill(); }
+  const p = bodyPath(gg);
+  ctx.fillStyle = look.body; ctx.fill(p);
+  ctx.save(); ctx.clip(p);
+  ctx.fillStyle = look.belly; ctx.fillRect(x - 5, y + Ht * .68, gg.TL + 10, Ht);
+  ctx.fillStyle = look.stripe; ctx.fillRect(x - 5, y + Ht * .6, gg.TL + 10, Ht * .09);
+  ctx.restore();
+  if (look.body === '#f4f6ff') { ctx.strokeStyle = 'rgba(0,0,0,.15)'; ctx.lineWidth = 2; ctx.stroke(p); }
+  // まど
+  for (let i = 0; i < 5; i++) { const ww = L * .11, wx = x + L * .08 + i * L * .17; ctx.fillStyle = '#e3f6ff'; rr(wx, y + Ht * .18, ww, Ht * .26, 8); ctx.fill(); }
+  ctx.fillStyle = '#4a3b6b'; T.win(ctx, x, y, L, Ht, N, look.shape); ctx.fill();
+  const lp = T.light(x, y, L, Ht, N, look.shape);
+  ctx.fillStyle = '#fffbe0'; ctx.beginPath(); ctx.arc(lp.x - U * 1.2, lp.y, Ht * .05, 0, 7); ctx.fill();
+  // かお
+  const fx = look.shape === 'flat' ? x + L + N - L * .1 : x + L + N * .42, fy = y + Ht * .62, es = Ht * .07;
+  ctx.fillStyle = '#3a2a3a';
+  if (happy) {
+    ctx.lineWidth = es * .45; ctx.strokeStyle = '#3a2a3a'; ctx.lineCap = 'round';
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(fx + s * es * 1.6, fy, es * .8, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(fx, fy + es * .9, es * 1.1, .15 * Math.PI, .85 * Math.PI); ctx.stroke();
+  } else {
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(fx + s * es * 1.6, fy, es * .55, es * .8, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(fx + s * es * 1.6 + es * .15, fy - es * .3, es * .2, 0, 7); ctx.fill(); ctx.fillStyle = '#3a2a3a'; }
+    ctx.lineWidth = es * .4; ctx.strokeStyle = '#3a2a3a'; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(fx, fy + es * 2.2, es * .8, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255,79,154,.35)'; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(fx + s * es * 3.2, fy + es * 1.3, es * .9, es * .55, 0, 0, 7); ctx.fill(); }
+  // パンタグラフ
+  ctx.strokeStyle = '#666'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + L * .4, y); ctx.lineTo(x + L * .5, y - Ht * .3); ctx.lineTo(x + L * .6, y); ctx.stroke();
+  ctx.fillStyle = '#666'; ctx.fillRect(x + L * .42, y - Ht * .32, L * .16, 3);
+  // シール
+  ctx.save(); ctx.clip(p);
+  for (const s of stamps) { s.t = Math.min(1, s.t + .08); emo(s.e, x + s.x, y + s.y, U * 7 * (1 + (1 - s.t) * .8)); }
+  // つや
+  if (gloss >= 0) {
+    const gx = x + (gloss % 1.6 - .3) * gg.TL;
+    const gr = ctx.createLinearGradient(gx - U * 10, 0, gx + U * 10, 0);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(.5, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gr; ctx.save(); ctx.transform(1, 0, -.4, 1, 0, 0); ctx.fillRect(gx - U * 10 + y * .4, y, U * 20, Ht); ctx.restore();
+  }
+  ctx.restore();
+  ctx.restore();
+}
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function emo(e, x, y, s) { ctx.font = `${s}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(e, x, y); }
+function drawTool() {
+  if (!down) return;
+  const { x, y } = down;
+  if (step === 'mud') emo('🧽', x, y, U * 12);
+  else if (step === 'rinse') {
+    emo('🚿', x + U * 3, y - U * 9, U * 12);
+    ctx.fillStyle = 'rgba(127,208,255,.35)'; ctx.beginPath(); ctx.moveTo(x - U * 2, y - U * 6); ctx.lineTo(x - U * 7, y + U * 6); ctx.lineTo(x + U * 7, y + U * 6); ctx.lineTo(x + U * 2, y - U * 6); ctx.fill();
+    waterT -= 1; if (waterT <= 0) { waterT = 8; A.noise(.25, .05, 0, 3000); }
+  } else if (step === 'shine') {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(time * 10) * .2);
+    ctx.fillStyle = '#ff9fca'; rr(-U * 6, -U * 4.5, U * 12, U * 9, U * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillRect(-U * 6, -U * 1.5, U * 12, U * 1.2); ctx.fillRect(-U * 6, U * 1.2, U * 12, U * 1.2);
+    ctx.restore();
+  }
+}
+
+// ---------- ループ ----------
+let last = performance.now();
+function loop(now) {
+  let dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (A.stickerOpen) dt = 0;
+  time += dt;
+  if (step === 'come') { tx = Math.min(0, tx + W * 1.1 * dt); if (tx >= 0) { startWash(); } }
+  if (step === 'go') { tx += W * (0.2 + Math.max(0, tx / W) * 2.5 + .3) * dt; if (tx > W * 1.1) arrive(); }
+  if (gloss >= 0) gloss += dt * .8;
+  for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; if (!p.star) p.vy += 600 * dt; p.life -= dt * (p.star ? 1.2 : 1.5); }
+  parts = parts.filter(p => p.life > 0);
+  drawScene();
+  drawTrain(tx);
+  if (tx === 0) { ctx.drawImage(foamC, 0, 0, W, H); ctx.drawImage(mudC, 0, 0, W, H); }
+  else if (step === 'come') { ctx.save(); ctx.translate(tx, 0); ctx.drawImage(foamC, 0, 0, W, H); ctx.drawImage(mudC, 0, 0, W, H); ctx.restore(); }
+  for (const p of parts) {
+    ctx.globalAlpha = Math.max(0, p.life);
+    if (p.star) emo('✨', p.x, p.y, p.r * 2); else { ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  drawTool();
+  requestAnimationFrame(loop);
+}
+addEventListener('resize', () => { resize(); });
+look = LOOKS[0];
+resize();
+arrive();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 // オフラインでも あそべるように ぜんぶ ほぞんしておく
-const CACHE = 'asobou-v3';
-const FILES = ['./', './index.html', './shinkansen.html', './cooking.html', './fumikiri.html',
+const CACHE = 'asobou-v4';
+const FILES = ['./', './index.html', './shinkansen.html', './cooking.html', './fumikiri.html', './senro.html', './arai.html', './cake.html', './stickers.html', './common.js',
   './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -11,209 +11,422 @@
 <title>おりょうり</title>
 <style>
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  :root { --u: min(1vh, 1.05vw); }
   html, body { margin: 0; height: 100%; overflow: hidden; touch-action: none; }
   body { font-family: "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Meiryo", sans-serif;
     background: repeating-linear-gradient(45deg, #fff6c2 0 40px, #fff0b0 40px 80px); color: #c2185b; }
+  button { font-family: inherit; cursor: pointer; }
   #home { position: fixed; top: 14px; left: 14px; width: 72px; height: 72px; font-size: 36px; border-radius: 50%;
     background: #ff7eb6; border: 6px solid #fff; box-shadow: 0 6px 0 rgba(0,0,0,.15); z-index: 10; padding: 0; }
   #stars { position: fixed; top: 16px; right: 18px; background: #fff; color: #e0457b; border-radius: 30px;
     padding: 8px 22px; font-size: clamp(24px, 3.2vw, 38px); font-weight: bold; box-shadow: 0 5px 0 rgba(0,0,0,.1); z-index: 10; }
-  /* おきゃくさん */
-  #counter { position: absolute; top: 0; left: 0; right: 0; height: 34vh; display: flex; align-items: flex-end; justify-content: center;
+  /* おみせ */
+  #counter { position: absolute; top: 0; left: 0; right: 0; height: 30vh; display: flex; align-items: flex-end; justify-content: center;
     background: linear-gradient(#ffd6e8, #ffc2dc); border-bottom: 14px solid #ff8fc4; }
-  #guest { font-size: 22vh; line-height: 1; transform: translateY(14%); transition: transform .5s; }
+  #counter::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 5vh;
+    background: repeating-linear-gradient(90deg, #ff7eb6 0 6vh, #fff 6vh 12vh); border-radius: 0 0 3vh 3vh; }
+  #guest { font-size: calc(var(--u) * 19); line-height: 1; transform: translateY(14%); transition: transform .5s; position: relative; }
   #guest.out { transform: translate(-80vw, 14%); }
   #guest.happy { animation: jump .4s 3; }
+  #guest.no { animation: no .25s 3; }
   @keyframes jump { 50% { transform: translateY(-4%); } }
-  #bubble { position: absolute; left: calc(50% + 12vh); top: 3vh; background: #fff; border-radius: 30px; padding: 1vh 3vh;
-    font-size: 13vh; box-shadow: 0 6px 0 rgba(0,0,0,.08); transition: transform .3s; }
-  #bubble::after { content: ''; position: absolute; left: -26px; bottom: 26px; border: 18px solid transparent; border-right: 26px solid #fff; }
+  @keyframes no { 25% { transform: translate(-4%, 14%) rotate(-6deg); } 75% { transform: translate(4%, 14%) rotate(6deg); } }
+  #bubble { position: absolute; left: calc(50% + var(--u) * 12); top: 5.5vh; background: #fff; border-radius: 3vh; padding: .6vh 2.4vh 1vh;
+    box-shadow: 0 6px 0 rgba(0,0,0,.08); transition: transform .3s cubic-bezier(.3,1.6,.6,1); text-align: center; transform-origin: left bottom; }
+  #bubble::after { content: ''; position: absolute; left: -24px; bottom: 3vh; border: 16px solid transparent; border-right: 24px solid #fff; }
   #bubble.hide { transform: scale(0); }
+  #want { font-size: calc(var(--u) * 10); line-height: 1.1; }
+  #list { display: flex; gap: .6vh; justify-content: center; font-size: calc(var(--u) * 4.6); }
+  #list span { opacity: .3; position: relative; transition: opacity .3s; }
+  #list span.ok { opacity: 1; }
+  #list span.ok::after { content: '✔'; position: absolute; right: -.4em; bottom: -.2em; font-size: .6em; color: #2fae6a; font-weight: bold; }
+  #say { position: absolute; right: calc(50% + var(--u) * 12); top: 7vh; background: #fff; border-radius: 3vh; padding: 1vh 2.4vh;
+    font-size: calc(var(--u) * 5); font-weight: bold; color: #e0457b; box-shadow: 0 6px 0 rgba(0,0,0,.08); transform: scale(0);
+    transition: transform .3s cubic-bezier(.3,1.6,.6,1); transform-origin: right bottom; white-space: nowrap; }
+  #say.show { transform: scale(1); }
+  #hint { position: absolute; left: 50%; top: 33vh; transform: translateX(-50%); font-size: calc(var(--u) * 5); font-weight: bold;
+    color: #ff4f9a; text-shadow: 3px 3px 0 #fff, -2px -2px 0 #fff; white-space: nowrap; z-index: 15; pointer-events: none; }
+  /* まないた */
+  #board { position: absolute; left: 3vw; top: 46vh; width: calc(var(--u) * 30); height: calc(var(--u) * 19); background: #f3d39b;
+    border-radius: 3vh; border: 1vh solid #e0b46e; box-shadow: 0 1vh 0 rgba(0,0,0,.1); transform: scale(0); transition: transform .3s cubic-bezier(.3,1.6,.6,1); }
+  #board.show { transform: scale(1); }
+  #bitem { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 0 1vh;
+    font-size: calc(var(--u) * 11); line-height: 1; }
+  #bitem.p2 { font-size: calc(var(--u) * 8); } #bitem.p3 { font-size: calc(var(--u) * 6.5); } #bitem.p4 { font-size: calc(var(--u) * 5.5); }
+  #knife { position: absolute; right: -2vh; top: -9vh; font-size: calc(var(--u) * 10); transform: rotate(-30deg); transform-origin: 80% 20%; transition: transform .08s; }
+  #knife.down { transform: rotate(10deg) translateY(4vh); }
   /* キッチン */
-  #pan { position: absolute; left: 50%; top: 44vh; width: 38vh; height: 24vh; transform: translateX(-50%); }
-  #panbody { position: absolute; inset: 0; border-radius: 0 0 50% 50% / 0 0 100% 100%; background: #ff7eb6;
-    box-shadow: inset 0 -12px 0 rgba(0,0,0,.12), 0 10px 0 rgba(0,0,0,.08); }
-  #panrim { position: absolute; left: -3%; right: -3%; top: -6%; height: 22%; border-radius: 50%; background: #ffb3d1; border: 6px solid #ff4f9a; }
-  #panin { position: absolute; left: 6%; right: 6%; top: -2%; height: 50%; display: flex; flex-wrap: wrap; justify-content: center;
-    align-items: center; font-size: 7vh; gap: 0 1vh; z-index: 2; }
-  #panin span { display: inline-block; animation: wob 1s ease-in-out infinite; }
-  #pan.stir #panin span { animation: spin .6s linear infinite; }
+  #kit { position: absolute; left: 50%; top: 42vh; width: calc(var(--u) * 38); height: calc(var(--u) * 24); transform: translateX(-50%); transition: left .4s; }
+  #kit.bake { left: 42%; }
+  .in { position: absolute; left: 6%; right: 6%; top: -2%; height: 50%; display: flex; flex-wrap: wrap; justify-content: center;
+    align-items: center; font-size: calc(var(--u) * 6.5); gap: 0 .6vh; z-index: 2; }
+  .in span { display: inline-block; animation: wob 1s ease-in-out infinite; }
+  .stir .in span { animation: spin .6s linear infinite; }
   @keyframes wob { 50% { transform: rotate(10deg) translateY(-3px); } }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .handle { position: absolute; top: 4%; width: 18%; height: 14%; background: #ffd23f; border-radius: 20px; border: 5px solid #fff; }
-  .handle.l { left: -16%; } .handle.r { right: -16%; }
-  #steam { position: absolute; left: 50%; top: -60%; transform: translateX(-50%); font-size: 8vh; opacity: 0; transition: opacity .3s; }
-  #pan.stir #steam { opacity: 1; animation: rise 1s infinite; }
+  .fire { position: absolute; left: 50%; bottom: -12%; transform: translateX(-50%); font-size: calc(var(--u) * 5); letter-spacing: 1vh;
+    opacity: 0; transition: opacity .4s; white-space: nowrap; z-index: -1; }
+  .fire.on { opacity: 1; animation: flick .3s infinite alternate; }
+  @keyframes flick { to { transform: translateX(-50%) scaleY(1.15); } }
+  .pot { position: absolute; inset: 0; }
+  .pot .body { position: absolute; inset: 0; border-radius: 0 0 50% 50% / 0 0 100% 100%; background: #ff7eb6;
+    box-shadow: inset 0 -12px 0 rgba(0,0,0,.12), 0 10px 0 rgba(0,0,0,.08); }
+  .pot .rim { position: absolute; left: -3%; right: -3%; top: -6%; height: 22%; border-radius: 50%; background: #ffb3d1; border: 6px solid #ff4f9a; }
+  .pot .handle { position: absolute; top: 4%; width: 18%; height: 14%; background: #ffd23f; border-radius: 20px; border: 5px solid #fff; }
+  .pot .handle.l { left: -16%; } .pot .handle.r { right: -16%; }
+  .steam { position: absolute; left: 50%; top: -60%; transform: translateX(-50%); font-size: calc(var(--u) * 8); opacity: 0; z-index: 3; }
+  .stir .steam, .steam.on { opacity: 1; animation: rise 1s infinite; }
   @keyframes rise { 0% { transform: translate(-50%, 10px); opacity: .9; } 100% { transform: translate(-50%, -30px); opacity: 0; } }
-  #meter { position: absolute; left: 50%; top: 74vh; transform: translateX(-50%); width: 40vh; height: 3vh; background: #fff; border-radius: 20px;
-    overflow: hidden; border: 4px solid #ff8fc4; display: none; }
+  /* フライパン */
+  .fpan { position: absolute; left: 4%; right: 18%; top: 20%; bottom: 10%; }
+  .fpan .fbody { position: absolute; inset: 0; border-radius: 50%; background: #5d4a6b; border: 1.4vh solid #ff7eb6; box-shadow: 0 10px 0 rgba(0,0,0,.1); }
+  .fpan .fhandle { position: absolute; right: -32%; top: 40%; width: 40%; height: 18%; background: #ffd23f; border-radius: 3vh; border: 5px solid #fff; }
+  .fpan .in { top: 15%; height: 60%; }
+  .cake { position: absolute; left: 15%; right: 15%; top: 18%; bottom: 18%; border-radius: 50%; background: #f7d58c;
+    box-shadow: inset 0 -1vh 0 rgba(0,0,0,.08); transform: scale(0); transition: transform .4s, background 2s; z-index: 3; }
+  .cake.show { transform: scale(1); }
+  .cake.done { background: #e9a64a; }
+  .cake.patty { background: #b07a52; } .cake.patty.done { background: #7a4a2c; }
+  .cake.flip { animation: flip .8s ease-in-out; }
+  @keyframes flip { 0% { transform: translateY(0) rotateX(0); } 50% { transform: translateY(-22vh) rotateX(180deg); } 100% { transform: translateY(0) rotateX(360deg); } }
+  .cake .bub { position: absolute; width: 1.4vh; height: 1.4vh; border-radius: 50%; border: 2px solid rgba(255,255,255,.8); }
+  .fpan.ready { animation: wig .5s infinite; }
+  @keyframes wig { 25% { transform: rotate(-3deg); } 75% { transform: rotate(3deg); } }
+  /* ボウル と オーブン */
+  .bowl { position: absolute; left: 0; width: 70%; top: 15%; bottom: 0; }
+  .bowl .bbody { position: absolute; inset: 0; border-radius: 0 0 50% 50% / 0 0 100% 100%; background: #fff; border: 1vh solid #ffc93c; border-top: none; box-shadow: 0 10px 0 rgba(0,0,0,.08); }
+  .bowl .in { top: -12%; }
+  .oven { position: absolute; left: 82%; top: -8%; width: 75%; height: 118%; background: #ff9fca; border-radius: 3vh; border: 1vh solid #fff;
+    box-shadow: 0 1vh 0 rgba(0,0,0,.12); }
+  .oven .owin { position: absolute; left: 10%; right: 10%; top: 26%; bottom: 10%; background: #4a3b5b; border-radius: 2vh; overflow: hidden;
+    border: .8vh solid #ff7eb6; transform-origin: bottom; transition: transform .4s; }
+  .oven.open .owin { transform: perspective(400px) rotateX(-70deg); }
+  .oven .oglow { position: absolute; inset: 0; background: radial-gradient(#ffb347, #ff6a3d); opacity: 0; transition: opacity .6s; }
+  .oven.on .oglow { opacity: .9; animation: glow 1s infinite alternate; }
+  @keyframes glow { to { opacity: .6; } }
+  .oven .odish { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: calc(var(--u) * 8); }
+  .oven .otimer { position: absolute; left: 10%; top: 5%; width: 50%; height: 15%; background: #fff; border-radius: 1vh; color: #e0457b;
+    font-weight: bold; font-size: calc(var(--u) * 3.6); display: flex; align-items: center; justify-content: center; }
+  .oven .knob { position: absolute; top: 6%; width: 12%; aspect-ratio: 1; border-radius: 50%; background: #ffd23f; border: .4vh solid #fff; }
+  .oven.ready { animation: wig .5s infinite; }
+  #meter { position: absolute; left: 50%; top: 72vh; transform: translateX(-50%); width: calc(var(--u) * 40); height: 3vh; background: #fff; border-radius: 20px;
+    overflow: hidden; border: 4px solid #ff8fc4; display: none; z-index: 4; }
   #meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffd23f, #ff7eb6); transition: width .1s; }
-  #hint { position: absolute; left: 50%; top: 38vh; transform: translateX(-50%); font-size: clamp(26px, 4.5vh, 48px); font-weight: bold;
-    color: #ff4f9a; text-shadow: 3px 3px 0 #fff; white-space: nowrap; z-index: 5; }
-  #shelf { position: absolute; left: 0; right: 0; bottom: 3vh; display: flex; justify-content: center; gap: 3vw; }
-  .ing { width: 16vh; height: 16vh; font-size: 10vh; border-radius: 28px; border: 6px solid #fff; background: #ffd23f;
-    box-shadow: 0 8px 0 rgba(0,0,0,.12); padding: 0; line-height: 1; transition: opacity .3s, transform .15s; }
+  /* できあがり */
+  #plate { position: absolute; left: 50%; top: 38vh; width: calc(var(--u) * 34); height: calc(var(--u) * 30); transform: translateX(-50%) scale(0);
+    transition: transform .45s cubic-bezier(.3,1.6,.6,1); z-index: 6; }
+  #plate.show { transform: translateX(-50%) scale(1); }
+  #plate.serve { transition: transform .8s ease-in; transform: translate(-50%, -34vh) scale(.45); }
+  #plate::before { content: ''; position: absolute; left: -6%; right: -6%; bottom: 0; height: 32%; background: #fff; border-radius: 50%;
+    box-shadow: 0 8px 0 rgba(0,0,0,.08), inset 0 0 0 1vh #ffe3f0; }
+  #dish { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: calc(var(--u) * 24); line-height: 1; }
+  #tops { position: absolute; inset: 0; }
+  #tops span { position: absolute; font-size: calc(var(--u) * 6); transform: translate(-50%, -50%); animation: put .35s cubic-bezier(.3,1.6,.6,1) both; }
+  @keyframes put { 0% { transform: translate(-50%, -150%) scale(1.8); opacity: 0; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+  #shelf { position: absolute; left: 0; right: 0; bottom: 2.5vh; display: flex; justify-content: center; gap: 2vw; flex-wrap: nowrap; padding: 0 8px; }
+  .ing { width: calc(var(--u) * 14.5); height: calc(var(--u) * 14.5); font-size: calc(var(--u) * 9); border-radius: 26px; border: 6px solid #fff; background: #ffd23f;
+    box-shadow: 0 8px 0 rgba(0,0,0,.12); padding: 0; line-height: 1; transition: opacity .3s, transform .15s; flex: none; }
   .ing:nth-child(even) { background: #ff9fca; }
   .ing:active { transform: translateY(6px); box-shadow: 0 2px 0 rgba(0,0,0,.12); }
   .ing.used { opacity: .25; pointer-events: none; }
-  .fly { position: fixed; font-size: 10vh; z-index: 20; pointer-events: none; transition: all .55s cubic-bezier(.3,-0.4,.6,1); }
-  #dish { position: absolute; left: 50%; top: 46vh; transform: translateX(-50%) scale(0); font-size: 22vh; z-index: 6; transition: transform .4s cubic-bezier(.3,1.6,.6,1); cursor: pointer; }
-  #dish.show { transform: translateX(-50%) scale(1); }
-  #dish.serve { transition: all .7s ease-in; transform: translate(-50%, -32vh) scale(.5); }
-  #dish::before { content: ''; position: absolute; left: -10%; right: -10%; bottom: 4%; height: 22%; background: #fff; border-radius: 50%; z-index: -1; box-shadow: 0 6px 0 rgba(0,0,0,.08); }
-  .heart { position: fixed; font-size: 8vh; pointer-events: none; z-index: 30; animation: up 1.5s ease-out forwards; }
-  @keyframes up { to { transform: translateY(-30vh) scale(1.5); opacity: 0; } }
+  .ing.shake { animation: no .2s 3; }
+  .ing.go { width: auto; padding: 0 4vh; background: #ff4f9a; color: #fff; font-size: calc(var(--u) * 6); font-weight: bold; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.06); } }
+  .fly { position: fixed; font-size: calc(var(--u) * 9); z-index: 20; pointer-events: none; transition: all .55s cubic-bezier(.3,-0.4,.6,1); line-height: 1; }
 </style>
 </head>
 <body>
 <button id="home" onclick="location.href='index.html'">🏠</button>
 <div id="stars">🍽️ 0</div>
-<div id="counter"><div id="guest">🐰</div><div id="bubble" class="hide">🍛</div></div>
+<div id="counter"><div id="say"></div><div id="guest">🐰</div><div id="bubble" class="hide"><div id="want"></div><div id="list"></div></div></div>
 <div id="hint"></div>
-<div id="pan"><div id="steam">♨️</div><div class="handle l"></div><div class="handle r"></div><div id="panbody"></div><div id="panrim"></div><div id="panin"></div></div>
+<div id="board"><div id="bitem"></div><div id="knife">🔪</div></div>
+<div id="kit"></div>
 <div id="meter"><i></i></div>
-<div id="dish">🍛</div>
+<div id="plate"><div id="dish"></div><div id="tops"></div></div>
 <div id="shelf"></div>
+<script src="common.js"></script>
 <script>
-// ---------- おと ----------
-let AC;
-function ac() { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); return AC; }
-function tone(freq, dur, type = 'sine', vol = .2, when = 0, slideTo) {
-  const a = ac(), t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
-  o.type = type; o.frequency.setValueAtTime(freq, t);
-  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .02);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .05);
-}
-const plop = () => { tone(300, .2, 'sine', .3, 0, 120); tone(700, .1, 'triangle', .1, .05); };
-const stirS = () => tone(200 + Math.random() * 300, .08, 'triangle', .08);
-const ta_da = () => [523, 659, 784, 1046].forEach((f, i) => tone(f, .35, 'triangle', .15, i * .12));
-const yum = () => [880, 1100, 1320].forEach((f, i) => tone(f, .2, 'sine', .15, i * .1));
-function say(t) { if (window.AndroidTTS) { try { AndroidTTS.speak(t); } catch (e) {} return; }
-  try { const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; u.rate = .95; u.pitch = 1.35;
-    speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
-}
+const A = Asobou, S = A.S, $ = id => document.getElementById(id);
 
 // ---------- レシピ ----------
+const SAVORY = ['🥚', '🧀', '🌽', '🍅'], SWEET = ['🍓', '🍒', '🍫', '⭐'];
 const RECIPES = [
-  { dish: '🍛', name: 'カレー', ing: ['🥕', '🥔', '🧅', '🍖'] },
-  { dish: '🥞', name: 'ホットケーキ', ing: ['🥚', '🥛', '🧈', '🍓'] },
-  { dish: '🍕', name: 'ピザ', ing: ['🍅', '🧀', '🍄', '🫑'] },
-  { dish: '🍰', name: 'ケーキ', ing: ['🥚', '🥛', '🍓', '🍫'] },
-  { dish: '🍜', name: 'ラーメン', ing: ['🍥', '🥚', '🥬', '🍖'] },
-  { dish: '🍩', name: 'ドーナツ', ing: ['🥚', '🥛', '🍫', '🍬'] },
+  { dish: '🍛', name: 'カレー', ing: ['🥕', '🥔', '🍖', '🍚'], how: 'stir', tops: ['🥚', '🧀', '🌽', '🍅'] },
+  { dish: '🍜', name: 'ラーメン', ing: ['🍥', '🥚', '🥬', '🍖'], how: 'stir', tops: ['🍥', '🥚', '🌽', '🍖'] },
+  { dish: '🍲', name: 'おなべ', ing: ['🥕', '🥬', '🍖', '🍄'], how: 'stir', tops: SAVORY },
+  { dish: '🥞', name: 'ホットケーキ', ing: ['🥚', '🥛', '🍯', '🍌'], how: 'flip', tops: ['🍓', '🍌', '🍯', '🍒'] },
+  { dish: '🍔', name: 'ハンバーガー', ing: ['🍖', '🍞', '🧀', '🍅'], how: 'flip', patty: true, tops: ['🧀', '🍅', '🥬', '⭐'] },
+  { dish: '🍕', name: 'ピザ', ing: ['🍅', '🧀', '🍄', '🌽'], how: 'bake', tops: SAVORY },
+  { dish: '🍰', name: 'ケーキ', ing: ['🥚', '🥛', '🍓', '🍫'], how: 'bake', tops: SWEET },
+  { dish: '🍪', name: 'クッキー', ing: ['🥚', '🥛', '🍫', '🍯'], how: 'bake', tops: ['🍫', '🍓', '⭐', '🍒'] },
 ];
-const GUESTS = ['🐰', '🐻', '🐼', '🐱', '🐶', '🐸', '🐷', '🐨', '🦊', '🐧', '🐹', '🐯'];
-const $ = id => document.getElementById(id);
-let phase = 'wait', recipe, added = 0, stir = 0, served = 0, lastIdx = -1;
+const CUT = new Set(['🥕', '🥔', '🥬', '🍄', '🍅', '🍌']);
+const POOL = ['🥕', '🥔', '🍖', '🍚', '🍥', '🥚', '🥬', '🍄', '🥛', '🍯', '🍓', '🍞', '🧀', '🍅', '🌽', '🍫', '🍌'];
+const GUESTS = A.ANIMALS.concat(['🦄', '🐥']);
 
+let phase = 'wait', recipe, need, served = 0, lastIdx = -1, wrongSaid = 0, cutLeft = 0, cutting = null;
+let stir = 0, lastPt = null, flipT = 0, guardT = 0;
+
+// ---------- たすけ ----------
+function hint(t) { $('hint').textContent = t || ''; }
+function bubbleSay(t, ms = 1600) { const s = $('say'); s.textContent = t; s.classList.add('show'); clearTimeout(s._t); s._t = setTimeout(() => s.classList.remove('show'), ms); }
+function flyTo(e, fromEl, toEl, cb, scale = .6) {
+  const r = fromEl.getBoundingClientRect(), p = toEl.getBoundingClientRect();
+  const f = document.createElement('div'); f.className = 'fly'; f.textContent = e;
+  f.style.left = r.left + r.width / 2 + 'px'; f.style.top = r.top + r.height / 2 + 'px'; f.style.transform = 'translate(-50%,-50%)';
+  document.body.appendChild(f);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    f.style.left = (p.left + p.width / 2) + 'px'; f.style.top = (p.top + p.height / 2) + 'px'; f.style.transform = `translate(-50%,-50%) scale(${scale})`;
+  }));
+  setTimeout(() => { f.remove(); cb && cb(); }, 560);
+}
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+// ---------- おきゃくさん ----------
 function newGuest() {
   phase = 'wait';
-  const g = $('guest');
-  g.classList.add('out');
-  $('bubble').classList.add('hide');
-  $('dish').className = ''; $('panin').innerHTML = ''; $('shelf').innerHTML = ''; $('hint').textContent = '';
-  $('meter').style.display = 'none'; $('pan').style.display = '';
+  const g = $('guest'); g.classList.add('out'); $('bubble').classList.add('hide');
+  $('plate').className = ''; $('tops').innerHTML = ''; $('shelf').innerHTML = ''; hint('');
+  $('meter').style.display = 'none'; $('kit').innerHTML = ''; $('kit').className = ''; $('board').classList.remove('show');
   let i; do { i = (Math.random() * RECIPES.length) | 0; } while (i === lastIdx); lastIdx = i;
-  recipe = RECIPES[i];
+  recipe = RECIPES[i]; need = recipe.ing.slice();
   setTimeout(() => {
-    g.style.transition = 'none'; g.textContent = GUESTS[(Math.random() * GUESTS.length) | 0];
+    g.style.transition = 'none'; g.textContent = A.pick(GUESTS);
     g.style.transform = 'translate(80vw, 14%)'; g.offsetWidth;
     g.style.transition = ''; g.style.transform = ''; g.classList.remove('out');
     setTimeout(() => {
-      $('bubble').textContent = recipe.dish; $('bubble').classList.remove('hide');
-      say(recipe.name + '、 ください！');
-      buildShelf();
+      $('want').textContent = recipe.dish;
+      $('list').innerHTML = recipe.ing.map(e => `<span>${e}</span>`).join('');
+      $('bubble').classList.remove('hide');
+      A.say(recipe.name + '、 ください！');
+      buildKitchen(); buildShelf();
     }, 600);
   }, 550);
 }
+function buildKitchen() {
+  const k = $('kit');
+  if (recipe.how === 'stir') {
+    k.innerHTML = '<div class="pot"><div class="steam">♨️</div><div class="handle l"></div><div class="handle r"></div><div class="body"></div><div class="rim"></div><div class="in"></div></div><div class="fire">🔥🔥🔥</div>';
+  } else if (recipe.how === 'flip') {
+    k.innerHTML = '<div class="fpan"><div class="fhandle"></div><div class="fbody"></div><div class="in"></div><div class="cake' + (recipe.patty ? ' patty' : '') + '"></div></div><div class="fire">🔥🔥🔥</div><div class="steam">♨️</div>';
+  } else {
+    k.className = 'bake';
+    k.innerHTML = '<div class="bowl"><div class="bbody"></div><div class="in"></div></div>' +
+      '<div class="oven"><div class="otimer">🕒</div><div class="knob" style="left:66%"></div><div class="knob" style="left:82%"></div><div class="owin"><div class="oglow"></div><div class="odish"></div></div></div>';
+  }
+}
+function target() { return $('kit').querySelector('.in'); }
 function buildShelf() {
-  phase = 'add'; added = 0;
-  $('hint').textContent = 'いれてね！';
-  recipe.ing.forEach(e => {
+  phase = 'add';
+  hint('ざいりょうを いれてね！');
+  const decoys = shuffle(POOL.filter(e => !recipe.ing.includes(e))).slice(0, 2);
+  shuffle(recipe.ing.concat(decoys)).forEach(e => {
     const b = document.createElement('button'); b.className = 'ing'; b.textContent = e;
-    b.addEventListener('pointerdown', ev => { ev.preventDefault(); addIng(b, e); });
+    b.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); pickIng(b, e); });
     $('shelf').appendChild(b);
   });
 }
-function addIng(btn, e) {
+function pickIng(btn, e) {
   if (phase !== 'add' || btn.classList.contains('used')) return;
-  ac(); btn.classList.add('used');
-  const r = btn.getBoundingClientRect(), p = $('pan').getBoundingClientRect();
-  const f = document.createElement('div'); f.className = 'fly'; f.textContent = e;
-  f.style.left = r.left + 'px'; f.style.top = r.top + 'px'; document.body.appendChild(f);
-  tone(600, .25, 'sine', .15, 0, 1200);
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    f.style.left = (p.left + p.width / 2 - r.width / 2) + 'px'; f.style.top = (p.top - r.height * 0.2) + 'px'; f.style.transform = 'scale(.6)';
-  }));
-  setTimeout(() => {
-    f.remove(); plop();
-    const s = document.createElement('span'); s.textContent = e; s.style.animationDelay = (-Math.random()) + 's';
-    $('panin').appendChild(s);
-    added++;
-    if (added === recipe.ing.length) startStir();
-  }, 560);
+  if (!need.includes(e)) {
+    btn.classList.remove('shake'); btn.offsetWidth; btn.classList.add('shake'); S.oops();
+    const g = $('guest'); g.classList.remove('no'); g.offsetWidth; g.classList.add('no');
+    if (wrongSaid++ < 3) { A.say('それは いらないよ'); bubbleSay('いらないよ〜'); }
+    return;
+  }
+  btn.classList.add('used'); need.splice(need.indexOf(e), 1);
+  A.tone(600, .25, 'sine', .15, 0, 1200);
+  if (CUT.has(e)) {
+    phase = 'fly';
+    $('board').classList.add('show');
+    flyTo(e, btn, $('bitem'), () => {
+      S.plop(); phase = 'cut'; cutLeft = 3; cutting = e;
+      $('bitem').className = ''; $('bitem').textContent = e;
+      hint('👆 トントン きってね！'); A.say('トントン きってね');
+    }, 1.2);
+  } else {
+    phase = 'fly';
+    flyTo(e, btn, target(), () => { S.plop(); addToPot(e); });
+  }
 }
-function startStir() {
-  phase = 'stir'; stir = 0;
-  $('hint').textContent = '👆 まぜまぜ しよう！';
-  say('まぜまぜ しよう！');
-  $('meter').style.display = 'block'; $('meter').firstElementChild.style.width = '0';
+function chop() {
+  if (phase !== 'cut') return;
+  cutLeft--; S.chop();
+  const kn = $('knife'); kn.classList.add('down'); setTimeout(() => kn.classList.remove('down'), 110);
+  const n = 4 - cutLeft, bi = $('bitem');
+  bi.className = 'p' + Math.min(4, n); bi.textContent = cutting.repeat(n);
+  if (cutLeft <= 0) {
+    phase = 'fly'; hint('');
+    setTimeout(() => flyTo(cutting, bi, target(), () => { S.plop(); bi.textContent = ''; $('board').classList.remove('show'); addToPot(cutting, true); }), 300);
+  }
 }
-// まぜる：こすっても タップしても OK
-let lastPt = null;
-const panEl = $('pan');
+function addToPot(e, small) {
+  const s = document.createElement('span'); s.textContent = e; s.style.animationDelay = (-Math.random()) + 's';
+  if (small) s.style.fontSize = '.75em';
+  target().appendChild(s);
+  const li = [...$('list').children].find(x => !x.classList.contains('ok') && x.textContent === e); if (li) li.classList.add('ok');
+  if (need.length === 0) { setTimeout(startCook, 400); } else { phase = 'add'; hint('ざいりょうを いれてね！'); }
+}
+
+// ---------- りょうりする ----------
+function startCook() {
+  $('shelf').innerHTML = '';
+  if (recipe.how === 'stir') {
+    phase = 'stir'; stir = 0; $('kit').querySelector('.fire').classList.add('on');
+    hint('👆 まぜまぜ しよう！'); A.say('ひを つけて、 まぜまぜ しよう！'); showMeter();
+  } else if (recipe.how === 'flip') {
+    phase = 'fry1'; flipT = 2.6;
+    const k = $('kit'); k.querySelector('.fire').classList.add('on'); k.querySelector('.in').innerHTML = '';
+    k.querySelector('.cake').classList.add('show');
+    A.say('じゅーじゅー やいてるよ'); hint('じゅーじゅー…');
+    sizzle();
+  } else {
+    phase = 'mix'; stir = 0; hint('👆 まぜまぜ しよう！'); A.say('まぜまぜ しよう！'); showMeter();
+  }
+}
+function showMeter() { $('meter').style.display = 'block'; $('meter').firstElementChild.style.width = '0'; }
 function addStir(v) {
-  if (phase !== 'stir') return;
-  stir = Math.min(100, stir + v); $('meter').firstElementChild.style.width = stir + '%';
-  panEl.classList.add('stir'); clearTimeout(panEl._t); panEl._t = setTimeout(() => panEl.classList.remove('stir'), 300);
-  if (Math.random() < .5) stirS();
-  if (stir >= 100) finish();
+  if (phase !== 'stir' && phase !== 'mix') return;
+  stir = Math.min(100, stir + v * (phase === 'mix' ? 1.3 : 1)); $('meter').firstElementChild.style.width = stir + '%';
+  const k = $('kit'); k.classList.add('stir'); clearTimeout(k._t); k._t = setTimeout(() => k.classList.remove('stir'), 300);
+  if (Math.random() < .5) A.tone(200 + Math.random() * 300, .08, 'triangle', .08);
+  if (stir >= 100) { $('meter').style.display = 'none'; k.classList.remove('stir'); if (phase === 'stir') cooked(); else toOven(); }
 }
+function sizzle() {
+  if (phase !== 'fry1' && phase !== 'flip' && phase !== 'fry2') return;
+  A.noise(.35, .05, 0, 4000); setTimeout(sizzle, 450);
+}
+function addBubbles() {
+  const c = $('kit').querySelector('.cake');
+  for (let i = 0; i < 7; i++) { const b = document.createElement('i'); b.className = 'bub'; b.style.left = (15 + Math.random() * 70) + '%'; b.style.top = (20 + Math.random() * 60) + '%'; c.appendChild(b); }
+}
+function doFlip() {
+  if (phase !== 'flip') return;
+  phase = 'flipping'; hint('');
+  const k = $('kit'), c = k.querySelector('.cake'), pan = k.querySelector('.fpan');
+  pan.classList.remove('ready'); c.classList.add('flip'); S.boing(); A.tone(400, .5, 'sine', .1, .1, 900);
+  setTimeout(() => { c.innerHTML = ''; c.classList.add('done'); }, 400);
+  setTimeout(() => { c.classList.remove('flip'); phase = 'fry2'; A.say(A.praise()); flipT = 2; sizzle(); }, 820);
+}
+function toOven() {
+  phase = 'toOven'; guardT = performance.now() + 900; hint('👆 オーブンに いれよう！'); A.say('オーブンに いれよう！');
+  $('kit').querySelector('.oven').classList.add('ready');
+}
+function putOven() {
+  if (phase !== 'toOven' || performance.now() < guardT) return;
+  phase = 'baking'; hint('');
+  const k = $('kit'), ov = k.querySelector('.oven'), inn = k.querySelector('.in');
+  ov.classList.remove('ready');
+  [...inn.children].forEach((s, i) => setTimeout(() => flyTo(s.textContent, s, ov.querySelector('.owin'), null, .4), i * 90));
+  setTimeout(() => { inn.innerHTML = ''; ov.classList.add('on'); A.tone(300, .2, 'square', .06); bake(3); }, 700);
+}
+function bake(n) {
+  const ov = $('kit').querySelector('.oven'), t = ov.querySelector('.otimer');
+  if (n > 0) {
+    t.textContent = n; A.say(['', 'いち', 'に', 'さん'][n]);
+    for (let i = 0; i < 4; i++) A.tone(1500, .04, 'square', .05, i * .25);
+    setTimeout(() => bake(n - 1), 1200);
+  } else {
+    t.textContent = 'チン！'; S.ding(); ov.classList.add('ready'); ov.querySelector('.odish').textContent = recipe.dish;
+    phase = 'openOven'; guardT = performance.now() + 900; hint('👆 オーブンを あけてね'); setTimeout(() => A.say('やけたよ！ あけてね'), 500);
+  }
+}
+function openOven() {
+  if (phase !== 'openOven' || performance.now() < guardT) return;
+  phase = 'opening'; const ov = $('kit').querySelector('.oven');
+  ov.classList.remove('ready', 'on'); ov.classList.add('open'); A.tone(500, .3, 'triangle', .1, 0, 300);
+  setTimeout(cooked, 500);
+}
+
+// ---------- できあがり ----------
+function cooked() {
+  phase = 'deco'; hint('');
+  A.tone(200, .3, 'sine', .3, 0, 900);
+  setTimeout(() => {
+    $('kit').innerHTML = ''; $('kit').className = '';
+    $('dish').textContent = recipe.dish; $('plate').className = 'show';
+    S.fanfare(); A.say('できあがり！ トッピング しよう！');
+    const r = $('plate').getBoundingClientRect(); A.confetti(r.left + r.width / 2, r.top + r.height / 2);
+    $('guest').classList.add('happy'); setTimeout(() => $('guest').classList.remove('happy'), 1300); bubbleSay('わあ！');
+    hint('トッピング して「どうぞ」');
+    recipe.tops.forEach(e => {
+      const b = document.createElement('button'); b.className = 'ing'; b.textContent = e;
+      b.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); topping(b, e); });
+      $('shelf').appendChild(b);
+    });
+    const go = document.createElement('button'); go.className = 'ing go'; go.textContent = 'どうぞ！';
+    go.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); serve(); });
+    $('shelf').appendChild(go);
+  }, 400);
+}
+function topping(btn, e) {
+  if (phase !== 'deco') return;
+  const tops = $('tops'); if (tops.children.length >= 14) { S.oops(); return; }
+  const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random());
+  const x = 50 + Math.cos(a) * d * 30, y = 52 + Math.sin(a) * d * 22;
+  flyTo(e, btn, $('dish'), () => {
+    const s = document.createElement('span'); s.textContent = e; s.style.left = x + '%'; s.style.top = y + '%';
+    tops.appendChild(s); S.pop();
+  }, .5);
+}
+function serve() {
+  if (phase !== 'deco') return;
+  phase = 'eat'; hint(''); $('shelf').innerHTML = '';
+  $('plate').className = 'show serve';
+  setTimeout(() => {
+    $('plate').className = ''; $('bubble').classList.add('hide');
+    A.say('いただきます！'); bubbleSay('もぐもぐ…', 2600);
+    let bite = 0;
+    const g = $('guest');
+    const chew = setInterval(() => { S.yum(); g.style.transform = bite % 2 ? '' : 'translateY(10%) scale(1.04,.96)'; if (++bite >= 6) { clearInterval(chew); g.style.transform = ''; finish(); } }, 350);
+  }, 820);
+}
+function finish() {
+  const g = $('guest'); g.classList.add('happy');
+  const tops = $('tops').children.length;
+  A.say(tops >= 3 ? 'すっごく おいしい！ ありがとう！' : 'おいしい！ ありがとう！'); bubbleSay('おいしい！💖', 2200);
+  const r = g.getBoundingClientRect();
+  for (let i = 0; i < 8; i++) setTimeout(() => A.fx(r.left + Math.random() * r.width, r.top + r.height * .3), i * 130);
+  served++; $('stars').textContent = '🍽️ ' + served;
+  setTimeout(() => {
+    g.classList.remove('happy');
+    if (served % 2 === 0) A.award(newGuest); else newGuest();
+  }, 2600);
+}
+
+// ---------- タッチ（まぜる・きる・ひっくりかえす・オーブン） ----------
 document.addEventListener('pointerdown', e => {
-  ac();
-  if (phase === 'stir') { lastPt = [e.clientX, e.clientY]; addStir(12); }
+  if (A.stickerOpen) return;
+  if (phase === 'stir' || phase === 'mix') { lastPt = [e.clientX, e.clientY]; addStir(12); }
+  else if (phase === 'cut') chop();
+  else if (phase === 'flip') doFlip();
+  else if (phase === 'fry1' || phase === 'fry2') { A.tone(900, .1, 'triangle', .08); }
+  else if (phase === 'toOven') putOven();
+  else if (phase === 'openOven') openOven();
 });
 document.addEventListener('pointermove', e => {
-  if (phase !== 'stir' || !lastPt || !e.buttons && e.pointerType === 'mouse') return;
+  if ((phase !== 'stir' && phase !== 'mix') || !lastPt || (!e.buttons && e.pointerType === 'mouse')) return;
   const d = Math.hypot(e.clientX - lastPt[0], e.clientY - lastPt[1]); lastPt = [e.clientX, e.clientY];
   addStir(d / 12);
 });
 document.addEventListener('pointerup', () => lastPt = null);
 
-function finish() {
-  phase = 'done'; panEl.classList.remove('stir');
-  $('meter').style.display = 'none'; $('hint').textContent = '';
-  tone(200, .3, 'sine', .3, 0, 900);
-  setTimeout(() => {
-    $('pan').style.display = 'none';
-    const d = $('dish'); d.textContent = recipe.dish; d.className = 'show';
-    ta_da(); say('できあがり！');
-    confetti(innerWidth / 2, innerHeight * 0.55);
-    $('hint').textContent = 'どうぞ してね 👆';
-    phase = 'serve';
-  }, 400);
-}
-$('dish').addEventListener('pointerdown', e => {
-  e.stopPropagation();
-  if (phase !== 'serve') return;
-  phase = 'eat'; $('hint').textContent = '';
-  $('dish').className = 'show serve';
-  setTimeout(() => {
-    $('dish').className = ''; $('bubble').textContent = '💖';
-    $('guest').classList.add('happy'); yum(); say('おいしい！ ありがとう！');
-    const g = $('guest').getBoundingClientRect();
-    for (let i = 0; i < 6; i++) setTimeout(() => heart(g.left + Math.random() * g.width, g.top + g.height * .3), i * 150);
-    served++; $('stars').textContent = '🍽️ ' + served;
-    setTimeout(() => { $('guest').classList.remove('happy'); newGuest(); }, 2600);
-  }, 700);
-});
-function heart(x, y, ch) {
-  const h = document.createElement('div'); h.className = 'heart'; h.textContent = ch || ['💖', '💛', '✨', '💕'][(Math.random() * 4) | 0];
-  h.style.left = x + 'px'; h.style.top = y + 'px'; document.body.appendChild(h); setTimeout(() => h.remove(), 1600);
-}
-function confetti(x, y) { for (let i = 0; i < 10; i++) heart(x + (Math.random() - .5) * 400, y + (Math.random() - .5) * 150, ['⭐', '✨', '🌸', '🌼'][i % 4]); }
+// フライパンの タイマー
+let last = performance.now();
+(function tick(now) {
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  if (!A.stickerOpen && (phase === 'fry1' || phase === 'fry2')) {
+    flipT -= dt;
+    if (flipT <= 0) {
+      if (phase === 'fry1') {
+        phase = 'flip'; addBubbles(); $('kit').querySelector('.fpan').classList.add('ready');
+        hint('👆 ひっくりかえして！'); A.say('ぷくぷく してきた！ ひっくりかえして！');
+      } else { phase = 'done'; $('kit').querySelector('.fire').classList.remove('on'); cooked(); }
+    }
+  }
+  requestAnimationFrame(tick);
+})(last);
 
 newGuest();
 </script>

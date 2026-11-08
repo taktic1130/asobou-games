@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff7eb6">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script>if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js");</script>
+<title>せんろを かこう</title>
+<style>
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; touch-action: none; background: #c8f0a8;
+    font-family: "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Meiryo", sans-serif; }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; }
+  button { font-family: inherit; cursor: pointer; }
+  .round { position: fixed; top: 14px; width: 72px; height: 72px; font-size: 36px; border-radius: 50%; padding: 0;
+    border: 6px solid #fff; box-shadow: 0 6px 0 rgba(0,0,0,.15); z-index: 5; }
+  .round:active { transform: translateY(4px); }
+  #home { left: 14px; background: #ff7eb6; }
+  #color { right: 14px; background: #ff8fc4; }
+  #score { position: fixed; top: 16px; right: 100px; background: #fff; color: #e0457b; border-radius: 30px; padding: 8px 20px;
+    font-size: clamp(24px, 3.2vw, 36px); font-weight: bold; box-shadow: 0 5px 0 rgba(0,0,0,.1); z-index: 5; }
+  #hint { position: fixed; bottom: 3vh; left: 50%; transform: translateX(-50%); background: #fff; color: #e0457b; border-radius: 30px;
+    padding: 10px 26px; font-size: clamp(20px, 3.6vh, 36px); font-weight: bold; white-space: nowrap; border: 5px solid #ffc93c;
+    box-shadow: 0 5px 0 rgba(0,0,0,.1); pointer-events: none; transition: opacity .4s; z-index: 5; }
+  #hint.hide { opacity: 0; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button class="round" id="home" onclick="location.href='index.html'">🏠</button>
+<div id="score">⭐ 0</div>
+<button class="round" id="color">🚄</button>
+<div id="hint">✏️ ゆびで せんろを かいてね！</div>
+<script src="common.js"></script>
+<script>
+const A = Asobou, S = A.S, $ = id => document.getElementById(id);
+const cv = $('c'), ctx = cv.getContext('2d');
+let W, H, U, DPR;
+const bgC = document.createElement('canvas'), bgX = bgC.getContext('2d');
+const trC = document.createElement('canvas'), trX = trC.getContext('2d');
+
+const COLORS = [
+  { body: '#ff8fc4', roof: '#ffd6e8', stripe: '#ffd23f', btn: '#ff8fc4' },
+  { body: '#ffd23f', roof: '#fff3b0', stripe: '#3a6fd8', btn: '#ffd23f' },
+  { body: '#f4f6ff', roof: '#ffffff', stripe: '#2f74e0', btn: '#7fb2ff' },
+  { body: '#33b37f', roof: '#c9f2dc', stripe: '#ff7eb6', btn: '#4cc58f' },
+];
+let colI = 0;
+const STNAMES = ['いちご', 'ばなな', 'めろん'];
+const GOODIES = ['⭐', '🍓', '🍬', '🌸', '💖', '🍭', '🍩', '🍒'];
+
+// ---------- けしき ----------
+let stations = [], items = [], decos = [];
+function srand(seed) { return () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }; }
+function layout() {
+  const r = srand(7);
+  stations = [[.18, .3], [.8, .34], [.52, .78]].map(([fx, fy], i) => ({
+    x: W * fx, y: H * fy, name: STNAMES[i], wait: A.pick(A.ANIMALS), s: null, cool: 0, newT: 0 }));
+  decos = [];
+  const kinds = ['🌳', '🌷', '🌼', '🌳', '🏠', '🌻', '🍄', '🌲'];
+  for (let i = 0; i < 26; i++) {
+    const x = r() * W, y = r() * H;
+    if (stations.some(s => Math.hypot(s.x - x, s.y - y) < U * 16) || y < U * 12) continue;
+    decos.push({ x, y, e: kinds[(r() * kinds.length) | 0], s: U * (4.5 + r() * 2.5) });
+  }
+  // いけ
+  decos.push({ pond: true, x: W * .86, y: H * .78, rx: U * 13, ry: U * 7 });
+  drawBG();
+}
+function drawBG() {
+  const c = bgX; c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  c.fillStyle = '#c8f0a8'; c.fillRect(0, 0, W, H);
+  const r = srand(3);
+  for (let i = 0; i < 40; i++) { c.fillStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.ellipse(r() * W, r() * H, U * (6 + r() * 8), U * (3 + r() * 4), 0, 0, 7); c.fill(); }
+  for (let i = 0; i < 160; i++) { c.fillStyle = ['#ffb3d1', '#fff176', '#ffffff', '#ff8fc4'][i % 4]; c.beginPath(); c.arc(r() * W, r() * H, U * .5, 0, 7); c.fill(); }
+  for (const d of decos) {
+    if (d.pond) {
+      c.fillStyle = '#8fd3f5'; c.beginPath(); c.ellipse(d.x, d.y, d.rx, d.ry, 0, 0, 7); c.fill();
+      c.strokeStyle = '#fff'; c.lineWidth = U * .6; c.stroke();
+      c.font = `${U * 5}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('🦆', d.x - d.rx * .3, d.y); c.fillText('🐟', d.x + d.rx * .4, d.y + d.ry * .2);
+      continue;
+    }
+    c.font = `${d.s}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(d.e, d.x, d.y);
+  }
+}
+function resize() {
+  DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; U = Math.min(W, H) / 100;
+  for (const c of [cv, bgC, trC]) { c.width = W * DPR; c.height = H * DPR; }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  layout();
+  // おおきさが かわったら せんろを かきなおす
+  if (pts || demo) { pts = null; train.state = 'none'; trX.clearRect(0, 0, trC.width, trC.height); startDemo(); }
+}
+
+// ---------- せんろ ----------
+let pts = null, closed = false, L = 0, STEP = 1, raw = null, drawing = false;
+function smooth(p) {
+  for (let it = 0; it < 2; it++) {
+    const q = [p[0]];
+    for (let i = 0; i < p.length - 1; i++) { const a = p[i], b = p[i + 1]; q.push({ x: a.x * .75 + b.x * .25, y: a.y * .75 + b.y * .25 }, { x: a.x * .25 + b.x * .75, y: a.y * .25 + b.y * .75 }); }
+    q.push(p[p.length - 1]); p = q;
+  }
+  return p;
+}
+function resample(p, step) {
+  const out = [{ x: p[0].x, y: p[0].y }]; let prev = out[0], need = step;
+  for (let i = 1; i < p.length; i++) {
+    const cur = p[i]; let d = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+    while (d >= need) { const t = need / d, n = { x: prev.x + (cur.x - prev.x) * t, y: prev.y + (cur.y - prev.y) * t }; out.push(n); prev = n; d = Math.hypot(cur.x - prev.x, cur.y - prev.y); need = step; }
+    need -= d; prev = cur;
+  }
+  return out;
+}
+function rawLen(p) { let s = 0; for (let i = 1; i < p.length; i++) s += Math.hypot(p[i].x - p[i - 1].x, p[i].y - p[i - 1].y); return s; }
+function posAt(s) {
+  const n = pts.length;
+  if (closed) s = ((s % L) + L) % L; else s = Math.max(0, Math.min(L, s));
+  const f = s / STEP; let i = Math.floor(f); const t = f - i;
+  if (!closed && i >= n - 1) { i = n - 2; }
+  const a = pts[i % n], b = pts[(i + 1) % n];
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, ang: Math.atan2(b.y - a.y, b.x - a.x) };
+}
+function finalize(p) {
+  STEP = U * 1.2;
+  p = smooth(p);
+  const len = rawLen(p);
+  closed = len > U * 70 && Math.hypot(p[0].x - p[p.length - 1].x, p[0].y - p[p.length - 1].y) < U * 10;
+  if (closed) p.push({ x: p[0].x, y: p[0].y });
+  let q = resample(p, STEP);
+  if (closed && q.length > 2 && Math.hypot(q[q.length - 1].x - q[0].x, q[q.length - 1].y - q[0].y) < STEP * .6) q.pop();
+  pts = q; L = closed ? pts.length * STEP : (pts.length - 1) * STEP;
+  for (const st of stations) {
+    let best = -1, bd = U * 11;
+    pts.forEach((pt, i) => { const d = Math.hypot(pt.x - st.x, pt.y - st.y); if (d < bd) { bd = d; best = i; } });
+    st.s = best >= 0 ? best * STEP : null; st.cool = 0;
+  }
+  renderTrack();
+  train.s = SPACING() * (CARS - 1) + U * 5; train.v = 0; train.state = 'run'; train.wait = 0;
+  train.prevS = train.s;
+  S.whistle();
+  const n = stations.filter(s => s.s !== null).length;
+  setTimeout(() => A.say(closed ? 'ぐるっと まわる せんろ が できた！' : n ? 'せんろ が できた！ しゅっぱつ！' : 'しゅっぱつ しんこう！'), 300);
+}
+function renderTrack() {
+  const c = trX; c.setTransform(DPR, 0, 0, DPR, 0, 0); c.clearRect(0, 0, W, H);
+  if (!pts) return;
+  const n = pts.length, path = (off) => {
+    c.beginPath();
+    for (let i = 0; i < n + (closed ? 1 : 0); i++) {
+      const a = pts[i % n], b = pts[Math.min(closed ? (i + 1) % n : i + 1, n - 1)], pa = pts[Math.max(0, closed ? (i - 1 + n) % n : i - 1)];
+      const dx = b.x - pa.x, dy = b.y - pa.y, d = Math.hypot(dx, dy) || 1;
+      const x = a.x - dy / d * off, y = a.y + dx / d * off;
+      i ? c.lineTo(x, y) : c.moveTo(x, y);
+    }
+  };
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  path(0); c.strokeStyle = 'rgba(0,0,0,.08)'; c.lineWidth = U * 8; c.stroke();
+  path(0); c.strokeStyle = '#e3d3b8'; c.lineWidth = U * 6.6; c.stroke();
+  c.fillStyle = '#a0704e';
+  for (let i = 0; i < n; i += 3) {
+    const a = pts[i], b = pts[Math.min(i + 1, n - 1)] === a ? pts[i - 1] : pts[Math.min(i + 1, n - 1)];
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    c.save(); c.translate(a.x, a.y); c.rotate(ang); c.fillRect(-U * .6, -U * 3, U * 1.2, U * 6); c.restore();
+  }
+  c.strokeStyle = '#7d7d92'; c.lineWidth = U * .75;
+  path(U * 1.7); c.stroke(); path(-U * 1.7); c.stroke();
+}
+
+// ---------- でんしゃ ----------
+const CARS = 3, CARLEN = () => U * 9, CARW = () => U * 5, SPACING = () => U * 10.4;
+const train = { s: 0, v: 0, state: 'none', wait: 0, prevS: 0, seats: [[null, null], [null, null], [null, null]], stopAt: null, stopT: 0 };
+let score = 0, movers = [], parts = [], time = 0, rattleT = 0, demo = null, hintT = 0;
+function carPos(k) { return posAt(train.s - k * SPACING()); }
+function drawCar(k) {
+  const p = carPos(k), c = COLORS[colI], len = CARLEN(), w = CARW();
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang);
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; rr(-len / 2 + U * .6, -w / 2 + U * .9, len, w, w * .35); ctx.fill();
+  const noseF = k === 0, noseB = k === CARS - 1;
+  ctx.fillStyle = c.body; ctx.beginPath();
+  const x0 = -len / 2 - (noseB ? w * .55 : 0), x1 = len / 2 + (noseF ? w * .55 : 0);
+  ctx.moveTo(-len / 2, -w / 2); ctx.lineTo(len / 2, -w / 2);
+  if (noseF) ctx.quadraticCurveTo(x1, -w / 2, x1, 0), ctx.quadraticCurveTo(x1, w / 2, len / 2, w / 2); else ctx.lineTo(len / 2, w / 2);
+  ctx.lineTo(-len / 2, w / 2);
+  if (noseB) ctx.quadraticCurveTo(x0, w / 2, x0, 0), ctx.quadraticCurveTo(x0, -w / 2, -len / 2, -w / 2); else ctx.closePath();
+  ctx.fill();
+  if (c.body === '#f4f6ff') { ctx.strokeStyle = 'rgba(0,0,0,.15)'; ctx.lineWidth = 2; ctx.stroke(); }
+  ctx.fillStyle = c.roof; rr(-len / 2 + U * .8, -w * .32, len - U * 1.6, w * .64, w * .25); ctx.fill();
+  ctx.fillStyle = c.stripe; ctx.fillRect(-len / 2 + U * .4, -w * .5, len - U * .8, w * .1); ctx.fillRect(-len / 2 + U * .4, w * .4, len - U * .8, w * .1);
+  if (noseF) { ctx.fillStyle = '#4a3b6b'; ctx.beginPath(); ctx.ellipse(len / 2 + w * .12, 0, w * .2, w * .34, 0, 0, 7); ctx.fill(); }
+  if (noseB) { ctx.fillStyle = '#4a3b6b'; ctx.beginPath(); ctx.ellipse(-len / 2 - w * .12, 0, w * .2, w * .34, 0, 0, 7); ctx.fill(); }
+  if (k === 1) { ctx.strokeStyle = '#777'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-U * 1.5, -w * .3); ctx.lineTo(U * 1.5, w * .3); ctx.moveTo(-U * 1.5, w * .3); ctx.lineTo(U * 1.5, -w * .3); ctx.stroke(); }
+  ctx.restore();
+  // おきゃくさん（まっすぐ たてて かく）
+  train.seats[k].forEach((e, j) => {
+    if (!e) return;
+    const off = (j - .5) * len * .42;
+    emo(e, p.x + Math.cos(p.ang) * off, p.y + Math.sin(p.ang) * off, U * 3.8);
+  });
+}
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function emo(e, x, y, s) { ctx.font = `${s}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(e, x, y); }
+function seatPos(k, j) { const p = carPos(k), off = (j - .5) * CARLEN() * .42; return { x: p.x + Math.cos(p.ang) * off, y: p.y + Math.sin(p.ang) * off }; }
+
+// ---------- おたから ----------
+function spawnItem() {
+  for (let t = 0; t < 30; t++) {
+    const x = U * 8 + Math.random() * (W - U * 16), y = U * 14 + Math.random() * (H - U * 24);
+    if (stations.some(s => Math.hypot(s.x - x, s.y - y) < U * 14) || items.some(i => Math.hypot(i.x - x, i.y - y) < U * 14)) continue;
+    items.push({ x, y, e: A.pick(GOODIES), ph: Math.random() * 6, got: 0 }); return;
+  }
+}
+function burst(x, y, n = 12) {
+  const cols = ['#ff7eb6', '#ffd23f', '#ffffff', '#ff4f9a', '#fff176'];
+  for (let i = 0; i < n; i++) { const a = Math.random() * 7, s = 80 + Math.random() * 220; parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, c: cols[i % 5], r: 3 + Math.random() * 5 }); }
+}
+
+// ---------- えき ----------
+function crossed(a, b, s) {
+  if (!closed) return a < s && s <= b;
+  const d = ((s - a) % L + L) % L; return d > 0 && d <= b - a;
+}
+function stopAtStation(st) {
+  train.state = 'stop'; train.stopT = 2.6; train.stopAt = st;
+  S.chime(); setTimeout(() => A.say(st.name + ' えき！'), 200);
+  // おりる
+  const occ = []; train.seats.forEach((r, k) => r.forEach((e, j) => { if (e) occ.push([k, j]); }));
+  if (occ.length && (occ.length >= 4 || Math.random() < .5)) {
+    const [k, j] = A.pick(occ), e = train.seats[k][j], from = seatPos(k, j); train.seats[k][j] = null;
+    setTimeout(() => { movers.push({ e, from, to: { x: st.x + U * 8, y: st.y + U * 2 }, p: 0, kind: 'off' }); S.boing(); }, 500);
+  }
+  // のる
+  if (st.wait) {
+    const free = []; train.seats.forEach((r, k) => r.forEach((e, j) => { if (!e) free.push([k, j]); }));
+    if (free.length) {
+      const [k, j] = A.pick(free), e = st.wait; st.wait = null; st.newT = 6;
+      setTimeout(() => { movers.push({ e, from: { x: st.x, y: st.y - U * 3 }, k, j, p: 0, kind: 'on' }); S.boing(); }, 1200);
+    }
+  }
+}
+function drawStation(st) {
+  const w = U * 15, h = U * 7;
+  ctx.fillStyle = 'rgba(0,0,0,.1)'; rr(st.x - w / 2 + 4, st.y - h / 2 + 6, w, h, U * 1.5); ctx.fill();
+  ctx.fillStyle = '#ffe9a8'; rr(st.x - w / 2, st.y - h / 2, w, h, U * 1.5); ctx.fill();
+  ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = U * .8; ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ff4f9a'; ctx.lineWidth = U * .5;
+  const bw = U * 15, bh = U * 4.6; rr(st.x - bw / 2, st.y - h / 2 - bh - U * 1.4, bw, bh, U * 1.2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#e0457b'; ctx.font = `bold ${U * 2.8}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(st.name + ' えき', st.x, st.y - h / 2 - bh / 2 - U * 1.4);
+  if (st.wait) emo(st.wait, st.x, st.y - Math.abs(Math.sin(time * 4 + st.x)) * U * 1.2, U * 5.5);
+}
+
+// ---------- おてほん（さいしょに じどうで かく） ----------
+function startDemo() {
+  // えきの すぐ したを とおる わっか
+  const [a, b, c] = stations.map(st => ({ x: st.x, y: st.y + U * 7 }));
+  const key = [a, { x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - H * .12 }, b, { x: b.x + W * .04, y: (b.y + c.y) / 2 + H * .05 }, c, { x: a.x - W * .06, y: (a.y + c.y) / 2 + H * .1 }, a];
+  const p = [];
+  for (let i = 0; i < key.length - 1; i++) for (let t = 0; t < 1; t += 1 / 15) p.push({ x: key[i].x + (key[i + 1].x - key[i].x) * t, y: key[i].y + (key[i + 1].y - key[i].y) * t });
+  p.push({ x: a.x, y: a.y });
+  // かどを まるく
+  let q = p; for (let k = 0; k < 4; k++) q = q.map((pt, i) => i === 0 || i === q.length - 1 ? pt : { x: (q[i - 1].x + pt.x * 2 + q[i + 1].x) / 4, y: (q[i - 1].y + pt.y * 2 + q[i + 1].y) / 4 });
+  demo = { p: q, i: 0 };
+}
+
+// ---------- タッチ ----------
+let downAt = null;
+cv.addEventListener('pointerdown', e => {
+  if (A.stickerOpen) return;
+  if (demo) { demo = null; raw = null; }
+  drawing = true; raw = [{ x: e.clientX, y: e.clientY }]; downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
+  cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener('pointermove', e => {
+  if (!drawing) return;
+  const l = raw[raw.length - 1];
+  if (Math.hypot(e.clientX - l.x, e.clientY - l.y) > U * .8) {
+    raw.push({ x: e.clientX, y: e.clientY });
+    if (raw.length % 4 === 0) A.tone(600 + Math.random() * 300, .05, 'triangle', .04);
+  }
+});
+function endDraw() {
+  if (!drawing) return; drawing = false;
+  const len = rawLen(raw);
+  if (len < U * 4) {
+    // タップ
+    if (pts && train.state !== 'none') {
+      const p = carPos(0);
+      for (let k = 0; k < CARS; k++) { const q = carPos(k); if (Math.hypot(q.x - downAt.x, q.y - downAt.y) < U * 8) { S.horn(); burst(q.x, q.y); raw = null; return; } }
+    }
+    burst(downAt.x, downAt.y, 6); S.tap(); raw = null; return;
+  }
+  if (len < U * 30) { raw = null; A.say('もっと ながく かいてね'); S.oops(); return; }
+  finalize(raw); raw = null; $('hint').classList.add('hide');
+}
+cv.addEventListener('pointerup', endDraw); cv.addEventListener('pointercancel', endDraw);
+$('color').addEventListener('pointerdown', e => {
+  e.stopPropagation(); colI = (colI + 1) % COLORS.length; $('color').style.background = COLORS[colI].btn; S.sparkle();
+});
+
+// ---------- ループ ----------
+let last = performance.now();
+function loop(now) {
+  let dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (A.stickerOpen) dt = 0;
+  time += dt;
+  // おてほん
+  if (demo) {
+    demo.i += dt * 45;
+    raw = demo.p.slice(0, Math.max(2, Math.floor(demo.i)));
+    if (demo.i >= demo.p.length) { finalize(demo.p.slice()); demo = null; raw = null; hintT = 4; }
+  }
+  if (hintT > 0) { hintT -= dt; if (hintT <= 0) { $('hint').classList.remove('hide'); A.say('ゆびで せんろを かいてね！'); } }
+  // でんしゃ
+  if (pts && train.state === 'run') {
+    train.v = Math.min(U * 24, train.v + U * 20 * dt);
+    const a = train.s; train.s += train.v * dt;
+    if (!closed && train.s >= L) { train.s = L; train.state = 'end'; train.wait = 1.2; train.v = 0; A.say('とうちゃく！'); S.chime(); }
+    for (const st of stations) {
+      st.cool = Math.max(0, st.cool - dt);
+      if (st.s !== null && st.cool <= 0 && crossed(a, train.s, st.s)) { st.cool = 3; train.v = 0; stopAtStation(st); break; }
+    }
+    rattleT -= dt; if (rattleT <= 0) { rattleT = .45; A.tone(90, .06, 'square', .06); A.tone(70, .06, 'square', .06, .09); }
+    // おたから
+    const h = carPos(0);
+    for (const it of items) if (!it.got && Math.hypot(it.x - h.x, it.y - h.y) < U * 7) {
+      it.got = .01; score++; $('score').textContent = '⭐ ' + score; S.pop(); burst(it.x, it.y);
+      if (score % 8 === 0) setTimeout(() => A.award(), 600);
+      setTimeout(spawnItem, 2500);
+    }
+  } else if (train.state === 'stop') {
+    train.stopT -= dt; if (train.stopT <= 0) { train.state = 'run'; S.whistle(); }
+  } else if (train.state === 'end') {
+    train.wait -= dt;
+    if (train.wait <= 0) {
+      // ぎゃくに はしる
+      pts.reverse(); train.s = L - train.s + SPACING() * (CARS - 1);
+      train.seats.reverse();
+      for (const st of stations) if (st.s !== null) { st.s = L - st.s; st.cool = 0; }
+      train.state = 'run'; S.whistle();
+    }
+  }
+  for (const st of stations) if (!st.wait && st.newT > 0) { st.newT -= dt; if (st.newT <= 0) st.wait = A.pick(A.ANIMALS.concat(['🦄', '🐥'])); }
+  for (const it of items) if (it.got) it.got += dt * 2.5;
+  items = items.filter(i => !i.got || i.got < 1);
+  for (const m of movers) {
+    m.p += dt * 1.3;
+    if (m.p >= 1 && m.kind === 'on') { train.seats[m.k][m.j] = m.e; m.done = true; A.tone(1046, .2, 'sine', .2); A.tone(1318, .3, 'sine', .2, .12); }
+    if (m.kind === 'off' && m.p >= 2) m.done = true;
+  }
+  movers = movers.filter(m => !m.done);
+  for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; p.life -= dt * 1.5; }
+  parts = parts.filter(p => p.life > 0);
+
+  // かく
+  ctx.drawImage(bgC, 0, 0, W, H);
+  ctx.drawImage(trC, 0, 0, W, H);
+  if (raw && raw.length > 1) {
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); raw.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+    ctx.strokeStyle = 'rgba(255,79,154,.75)'; ctx.lineWidth = U * 2.2; ctx.setLineDash([U * 2, U * 2]); ctx.stroke(); ctx.setLineDash([]);
+    if (demo) { const l = raw[raw.length - 1]; emo('👆', l.x + U * 2, l.y + U * 4, U * 8); }
+  }
+  for (const st of stations) drawStation(st);
+  for (const it of items) {
+    ctx.globalAlpha = it.got ? Math.max(0, 1 - it.got) : 1;
+    emo(it.e, it.x, it.y + Math.sin(time * 2 + it.ph) * U * .8 - (it.got || 0) * U * 8, U * 7 * (1 + (it.got || 0)));
+    ctx.globalAlpha = 1;
+  }
+  if (pts) for (let k = CARS - 1; k >= 0; k--) drawCar(k);
+  for (const m of movers) {
+    if (m.kind === 'on') {
+      const to = seatPos(m.k, m.j), q = Math.min(1, m.p);
+      emo(m.e, m.from.x + (to.x - m.from.x) * q, m.from.y + (to.y - m.from.y) * q - Math.sin(q * Math.PI) * U * 8, U * (5.5 - q * 1.7));
+    } else {
+      const q = Math.min(1, m.p), w = Math.max(0, m.p - 1);
+      ctx.globalAlpha = 1 - w;
+      emo(m.e, m.from.x + (m.to.x - m.from.x) * q + w * U * 10, m.from.y + (m.to.y - m.from.y) * q - Math.sin(q * Math.PI) * U * 8, U * 5);
+      if (w > 0) emo('👋', m.to.x + w * U * 10 + U * 3, m.to.y - U * 3, U * 3);
+      ctx.globalAlpha = 1;
+    }
+  }
+  for (const p of parts) { ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(loop);
+}
+addEventListener('resize', resize);
+resize();
+for (let i = 0; i < 6; i++) spawnItem();
+$('hint').classList.add('hide');
+startDemo();
+setTimeout(() => A.say('せんろを かくよ。 みててね'), 300);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -13,7 +13,7 @@ VERSION_CODE="${VERSION_CODE:-1}"; VERSION_NAME="${VERSION_NAME:-1.0}"
 B="$T/out"; rm -rf "$B"; mkdir -p "$B/res/mipmap-xxxhdpi" "$B/assets/www" "$B/classes" "$B/dex"
 # アイコンと ゲームの ファイル
 cp "$ROOT/icon-192.png" "$B/res/mipmap-xxxhdpi/ic_launcher.png"
-cp "$ROOT"/*.html "$ROOT/icon-192.png" "$ROOT/icon-512.png" "$B/assets/www/"
+cp "$ROOT"/*.html "$ROOT/common.js" "$ROOT/icon-192.png" "$ROOT/icon-512.png" "$B/assets/www/"
 
 "$BT/aapt2.exe" compile --dir "$(cygpath -w "$B/res")" -o "$(cygpath -w "$B/res.zip")"
 "$BT/aapt2.exe" link -o "$(cygpath -w "$B/base.apk")" -I "$(cygpath -w "$JAR")" \
