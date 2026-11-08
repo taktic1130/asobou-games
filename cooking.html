@@ -90,7 +90,7 @@ const plop = () => { tone(300, .2, 'sine', .3, 0, 120); tone(700, .1, 'triangle'
 const stirS = () => tone(200 + Math.random() * 300, .08, 'triangle', .08);
 const ta_da = () => [523, 659, 784, 1046].forEach((f, i) => tone(f, .35, 'triangle', .15, i * .12));
 const yum = () => [880, 1100, 1320].forEach((f, i) => tone(f, .2, 'sine', .15, i * .1));
-function say(t) {
+function say(t) { if (window.AndroidTTS) { try { AndroidTTS.speak(t); } catch (e) {} return; }
   try { const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; u.rate = .95; u.pitch = 1.35;
     speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
 }
