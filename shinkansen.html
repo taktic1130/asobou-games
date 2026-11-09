@@ -637,7 +637,7 @@ function updBeam(dt) {
       if (score % 15 === 0) setTimeout(() => A.award(), 1600);
     }
   }
-  if (beam.t > 2.5) { beam = null; if (beamCount >= 10) pendingRobot = true; else setTimeout(() => A.say(A.pick(['すごい！', 'やったね！', 'かんぺき！'])), 100); }
+  if (beam.t > 2.5) { beam = null; if (beamCount >= 5) pendingRobot = true; else setTimeout(() => A.say(A.pick(['すごい！', 'やったね！', 'かんぺき！'])), 100); }
 }
 function drawBeam() {
   for (const b of booms) {
