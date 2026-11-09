@@ -87,5 +87,7 @@ items = [{'id': vid(t), 'text': t} for t in phrases]
 out = ROOT / 'voice'
 out.mkdir(exist_ok=True)
 (out / 'phrases.json').write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding='utf-8')
-(out / 'list.js').write_text('window.ASOBOU_VOICE = new Set(%s);\n' % json.dumps([i['id'] for i in items]), encoding='utf-8')
-print(len(items), 'phrases')
+# じっさいに MP3 が ある ものだけ のせる（ない ものは たんまつの よみあげに まかせる）
+ids = [i['id'] for i in items if (out / f"{i['id']}.mp3").exists()]
+(out / 'list.js').write_text('window.ASOBOU_VOICE = new Set(%s);\n' % json.dumps(ids), encoding='utf-8')
+print(len(items), 'phrases,', len(ids), 'with mp3')

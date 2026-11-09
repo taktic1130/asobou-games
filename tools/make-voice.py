@@ -40,6 +40,7 @@ def main():
         f.unlink()
     tmp.rmdir()
     print('done', len(todo))
+    subprocess.run([sys.executable, str(ROOT / 'tools' / 'voice-phrases.py')], check=True)
 
 
 if __name__ == '__main__':

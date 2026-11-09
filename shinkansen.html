@@ -306,8 +306,145 @@ let robot = null, pendingRobot = false, spaceStars = [], spaceItems = [];
 const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
 const lerp = (a, b, t) => a + (b - a) * t;
 const R_T = { stop: .8, morph: 2.6, pose: 3.8, lift: 6.3, space: 11.8, back: 13.3, unmorph: 14.8 };
+// ---------- 2かいめ からの へんしん：ちきゅうに ビーム ムービー ----------
+let robotCount = 0, RT = R_T, frags = [];
+const MOVIE = 8.8;
+function movieM() { return robot && robot.movie ? robot.t - robot.movie.t0 : -1; }
+function setupMovie() {
+  robotCount++;
+  if (robotCount >= 2) {
+    const t0 = R_T.lift + 1.4, space = t0 + MOVIE + 1.6;
+    RT = { ...R_T, space, back: space + 1.5, unmorph: space + 3 };
+    robot.movie = { t0 };
+    frags = [];
+    const n = 11;
+    for (let i = 0; i < n; i++) {
+      const a0 = i / n * Math.PI * 2 + (Math.random() - .5) * .2, a1 = (i + 1) / n * Math.PI * 2, am = (a0 + a1) / 2;
+      frags.push({ a0, a1, dx: Math.cos(am), dy: Math.sin(am), sp: .5 + Math.random() * .6, spin: (Math.random() - .5) * 3 });
+    }
+  } else RT = R_T;
+}
+function updMovie(t0, t) {
+  const mv = robot.movie; if (!mv) return;
+  const m0 = t0 - mv.t0, m = t - mv.t0;
+  const at = x => m0 < x && m >= x;
+  if (at(.2)) A.say('ちきゅうに むけて…');
+  if (at(1.2)) { A.say('ビーム はっしゃ！'); A.tone(160, 1, 'sawtooth', .08, 0, 2000); A.tone(320, 1, 'sine', .08, 0, 2600); }
+  if (at(2.2)) { flash = .7; shake = 1.2; A.noise(1.6, .35, 0, 250); A.tone(900, 1.5, 'sawtooth', .1, 0, 70); }
+  if (m > 2.4 && m < 3.8 && Math.random() < .3) A.noise(.2, .1, 0, 600 + Math.random() * 900);
+  if (at(3.8)) {
+    flash = 1; shake = 2.2; A.say('ドッカーン！ ちきゅうが こわれちゃった！');
+    A.noise(3, .5, 0, 120); A.noise(2, .3, .1, 900); A.tone(60, 2.5, 'square', .14, 0, 25); A.tone(300, 1.5, 'sawtooth', .1, 0, 40);
+    const e = earthGeo();
+    for (let i = 0; i < 70; i++) { const a = Math.random() * 7, s = 150 + Math.random() * 600;
+      parts.push({ x: e.x, y: e.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1.4, c: A.pick(['#ffe066', '#ff9a3c', '#ffffff', '#6fb2ff', '#7ccf6b']), r: 4 + Math.random() * 9 }); }
+  }
+  if (at(6.4)) { A.say('でも だいじょうぶ！ ちきゅうは もとどおり！'); S.sparkle(); }
+  if (at(7.8)) { S.chime(); }
+}
+// ちきゅうの いち（ムービーでは おおきく まんなかへ）
+function earthGeo() {
+  const m = movieM();
+  let k = 0;
+  if (m >= 0) k = m < 1.2 ? ease(m / 1.2) : m < 7.8 ? 1 : 1 - ease((m - 7.8) / 1);
+  return { x: lerp(W * .15, W * .33, k), y: lerp(H * 1.25, H * .64, k), r: lerp(H * .55, H * .26, k), k };
+}
+function earthBody(x, y, r) {
+  ctx.fillStyle = '#4f9ef0'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  ctx.fillStyle = '#7ccf6b';
+  ctx.beginPath(); ctx.ellipse(x - r * .3, y - r * .2, r * .32, r * .2, .5, 0, 7); ctx.ellipse(x + r * .3, y + r * .25, r * .26, r * .16, -.4, 0, 7);
+  ctx.ellipse(x + r * .25, y - r * .45, r * .16, r * .1, .2, 0, 7); ctx.ellipse(x - r * .35, y + r * .45, r * .18, r * .1, -.2, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.75)';
+  ctx.beginPath(); ctx.ellipse(x - r * .05, y - r * .62, r * .3, r * .06, 0, 0, 7); ctx.ellipse(x + r * .4, y + r * .05, r * .18, r * .05, .3, 0, 7); ctx.fill();
+  const gl = ctx.createRadialGradient(x - r * .35, y - r * .35, r * .1, x, y, r);
+  gl.addColorStop(0, 'rgba(255,255,255,.25)'); gl.addColorStop(.7, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(10,20,60,.35)');
+  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+}
+function drawEarth() {
+  const e = earthGeo(), m = movieM();
+  const broken = m >= 3.8 && m < 7.8;
+  // うすい ひかりの わ
+  if (!broken) { ctx.fillStyle = 'rgba(120,190,255,.18)'; ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 1.08, 0, 7); ctx.fill(); }
+  if (!broken) {
+    earthBody(e.x, e.y, e.r);
+    if (m > 2.4 && m < 3.8) {
+      // ひびわれ
+      const ck = Math.min(1, (m - 2.4) / 1.3), hx = e.x + e.r * .35, hy = e.y - e.r * .35;
+      ctx.save(); ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.clip();
+      ctx.strokeStyle = `rgba(255,${200 - ck * 120},60,.95)`; ctx.lineWidth = 3 + ck * 4; ctx.lineCap = 'round';
+      for (let i = 0; i < 9; i++) {
+        let x = hx, y = hy; const a = i / 9 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(x, y);
+        for (let j = 1; j <= 6; j++) { const d = e.r * .32 * ck * j / 3; x = hx + Math.cos(a + Math.sin(i * 3 + j) * .4) * d; y = hy + Math.sin(a + Math.sin(i * 3 + j) * .4) * d; ctx.lineTo(x, y); }
+        ctx.stroke();
+      }
+      const gl = ctx.createRadialGradient(hx, hy, 0, hx, hy, e.r * (.2 + ck * .8));
+      gl.addColorStop(0, 'rgba(255,255,220,.9)'); gl.addColorStop(1, 'rgba(255,120,40,0)');
+      ctx.fillStyle = gl; ctx.fillRect(e.x - e.r, e.y - e.r, e.r * 2, e.r * 2);
+      ctx.restore();
+    }
+    if (m >= 7.8 && m < 8.6) for (let i = 0; i < 2; i++) emo('✨', e.x + (Math.random() - .5) * e.r * 2, e.y + (Math.random() - .5) * e.r * 2, e.r * .25, 'middle');
+    return;
+  }
+  // バラバラ
+  const ft = Math.min(m - 3.8, 2.5), back = m > 6.3 ? ease((m - 6.3) / 1.5) : 0, d = ft * (1 - back);
+  for (const f of frags) {
+    const ox = f.dx * f.sp * e.r * 1.4 * d, oy = f.dy * f.sp * e.r * 1.4 * d, rot = f.spin * d;
+    ctx.save();
+    ctx.translate(e.x + ox, e.y + oy); ctx.rotate(rot); ctx.translate(-e.x, -e.y);
+    ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, e.r, f.a0, f.a1); ctx.closePath(); ctx.clip();
+    earthBody(e.x, e.y, e.r);
+    ctx.fillStyle = 'rgba(255,140,40,.55)'; ctx.beginPath(); ctx.arc(e.x, e.y, e.r * .35, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  // しょうげきは
+  const sk = (m - 3.8) / 2.2;
+  if (sk < 1) {
+    ctx.strokeStyle = `rgba(255,240,180,${1 - sk})`; ctx.lineWidth = 14 * (1 - sk) + 2;
+    ctx.beginPath(); ctx.ellipse(e.x, e.y, e.r * (1 + sk * 3), e.r * (1 + sk * 3) * .35, -.2, 0, 7); ctx.stroke();
+    const gl = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * (1.2 + sk));
+    gl.addColorStop(0, `rgba(255,255,230,${.9 * (1 - sk)})`); gl.addColorStop(.5, `rgba(255,150,60,${.6 * (1 - sk)})`); gl.addColorStop(1, 'rgba(255,80,40,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(e.x, e.y, e.r * (1.2 + sk), 0, 7); ctx.fill();
+    if (sk < .5) emo('💥', e.x, e.y, e.r * (1 + sk * 2), 'middle');
+  }
+  if (back > 0 && back < 1) for (let i = 0; i < 3; i++) emo('✨', e.x + (Math.random() - .5) * e.r * 3, e.y + (Math.random() - .5) * e.r * 3, e.r * .2, 'middle');
+}
+// ロボットの いち（ムービーでは みぎうえ）
+function robotMovieOffset() {
+  const m = movieM(); if (m < 0) return 0;
+  return m < 1.2 ? ease(m / 1.2) : m < 7.8 ? 1 : 1 - ease((m - 7.8) / 1);
+}
+function drawMovieBeam(hx, hy) {
+  const m = movieM(); if (m < 1.2 || m > 3.9) return;
+  const e = earthGeo(), tx = e.x + e.r * .35, ty = e.y - e.r * .35;
+  if (m < 2.2) {
+    const k = (m - 1.2), r = H * (.02 + k * .05) * (1 + Math.sin(time * 50) * .1);
+    const gr = ctx.createRadialGradient(hx, hy, 0, hx, hy, r * 2.2);
+    gr.addColorStop(0, '#ffffff'); gr.addColorStop(.4, 'rgba(255,230,120,.95)'); gr.addColorStop(1, 'rgba(255,79,154,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(hx, hy, r * 2.2, 0, 7); ctx.fill();
+    return;
+  }
+  const grow = Math.min(1, (m - 2.2) / .15), fadeK = m > 3.6 ? Math.max(0, 1 - (m - 3.6) / .3) : 1;
+  const ex = hx + (tx - hx) * grow, ey = hy + (ty - hy) * grow, ang = Math.atan2(ey - hy, ex - hx), len = Math.hypot(ex - hx, ey - hy);
+  const w = H * .05 * (1 + Math.sin(time * 45) * .15) * fadeK;
+  ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang); ctx.globalCompositeOperation = 'lighter';
+  const og = ctx.createLinearGradient(0, -w * 2.6, 0, w * 2.6);
+  og.addColorStop(0, 'rgba(155,92,255,0)'); og.addColorStop(.5, 'rgba(255,79,154,.8)'); og.addColorStop(1, 'rgba(155,92,255,0)');
+  ctx.fillStyle = og; ctx.fillRect(0, -w * 2.6, len, w * 5.2);
+  ctx.fillStyle = 'rgba(255,224,102,.95)'; ctx.fillRect(0, -w * .75, len, w * 1.5);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, -w * .3, len, w * .6);
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 3;
+  for (let k = 0; k < 2; k++) { ctx.beginPath(); ctx.moveTo(0, 0); for (let x = 0; x < len; x += 30) ctx.lineTo(x, (Math.random() - .5) * w * 3); ctx.stroke(); }
+  ctx.restore();
+  ctx.fillStyle = 'rgba(255,255,240,.9)'; ctx.beginPath(); ctx.arc(ex, ey, w * (1.5 + Math.random()), 0, 7); ctx.fill();
+}
+function drawLetterbox() {
+  const m = movieM(); if (m < 0) return;
+  const k = m < .6 ? m / .6 : m > MOVIE - .6 ? Math.max(0, (MOVIE - m) / .6) : 1, h = H * .1 * k;
+  ctx.fillStyle = '#000'; ctx.fillRect(-20, -20, W + 40, h + 20); ctx.fillRect(-20, H - h, W + 40, h + 20);
+}
+
 function startRobot() {
-  pendingRobot = false; robot = { t: 0, said: {} }; speed = 0; state = 'robot';
+  pendingRobot = false; robot = { t: 0, said: {} }; speed = 0; state = 'robot'; setupMovie();
   goBtn.classList.add('hide'); document.body.classList.add('robot'); hint('');
   flash = .8; A.say('あれれ？ しんかんせんの ようすが…');
   spaceStars = []; for (let i = 0; i < 90; i++) spaceStars.push({ x: Math.random(), y: Math.random(), z: .3 + Math.random() * .7 });
@@ -318,23 +455,24 @@ function updRobot(dt) {
   if (pendingRobot && !beam && !robot && !A.stickerOpen && (state === 'running' || state === 'braking' || state === 'stopped')) startRobot();
   if (!robot) return;
   const t0 = robot.t; robot.t += dt; const t = robot.t;
-  if (robotSay('henkei', R_T.stop, 'へんけい！')) { for (let i = 0; i < 6; i++) A.tone(220 + i * 110, .12, 'square', .07, i * .22); A.noise(.2, .1, 0, 3000); }
-  if (t0 < R_T.morph && t >= R_T.morph) { flash = 1; shake = .6; S.fanfare(); }
-  robotSay('robo', R_T.morph + .3, 'しんかんせん ロボ！');
-  if (robotSay('go', R_T.pose, 'うちゅうへ しゅっぱつ！')) { A.noise(2.5, .25, 0, 200); A.tone(80, 2.4, 'sawtooth', .08, 0, 300); shake = 1.5; }
-  if (t > R_T.pose && t < R_T.lift) {
+  if (robotSay('henkei', RT.stop, 'へんけい！')) { for (let i = 0; i < 6; i++) A.tone(220 + i * 110, .12, 'square', .07, i * .22); A.noise(.2, .1, 0, 3000); }
+  if (t0 < RT.morph && t >= RT.morph) { flash = 1; shake = .6; S.fanfare(); }
+  robotSay('robo', RT.morph + .3, 'しんかんせん ロボ！');
+  if (robotSay('go', RT.pose, 'うちゅうへ しゅっぱつ！')) { A.noise(2.5, .25, 0, 200); A.tone(80, 2.4, 'sawtooth', .08, 0, 300); shake = 1.5; }
+  if (t > RT.pose && t < RT.lift) {
     shake = Math.max(shake, .5);
     if (Math.random() < .5) parts.push({ x: trainCx() + (Math.random() - .5) * H * .12, y: GY - robotLift() + H * .02, vx: (Math.random() - .5) * 200, vy: 80 + Math.random() * 120, life: 1, c: Math.random() < .5 ? '#ffffff' : '#dddde8', r: 6 + Math.random() * 10 });
   }
-  robotSay('space', R_T.lift + .6, 'わあ！ うちゅう だ！ おほしさまを タッチしてね');
-  if (t > R_T.lift && t < R_T.space - 1) {
+  robotSay('space', RT.lift + .6, robot.movie ? 'わあ！ うちゅう だ！' : 'わあ！ うちゅう だ！ おほしさまを タッチしてね');
+  updMovie(t0, t);
+  if (t > RT.lift && t < RT.space - 1 && !(robot.movie && t > robot.movie.t0 - .5 && t < robot.movie.t0 + MOVIE)) {
     if (Math.random() < dt * 1.6 && spaceItems.length < 6) spaceItems.push({ x: W + 40, y: H * (.12 + Math.random() * .6), e: A.pick(['⭐', '🌟', '🌙', '💫', '✨']), vx: -W * (.15 + Math.random() * .1), got: 0 });
   }
   for (const it of spaceItems) { it.x += it.vx * dt; if (it.got) it.got += dt * 2.5; }
   spaceItems = spaceItems.filter(it => it.x > -60 && (!it.got || it.got < 1));
-  robotSay('home', R_T.space, 'ただいま！ もどってきたよ');
-  if (t0 < R_T.back && t >= R_T.back) { A.say('もとに もどるよ'); for (let i = 0; i < 6; i++) A.tone(880 - i * 110, .12, 'square', .07, i * .2); }
-  if (t >= R_T.unmorph) {
+  robotSay('home', RT.space, 'ただいま！ もどってきたよ');
+  if (t0 < RT.back && t >= RT.back) { A.say('もとに もどるよ'); for (let i = 0; i < 6; i++) A.tone(880 - i * 110, .12, 'square', .07, i * .2); }
+  if (t >= RT.unmorph) {
     robot = null; document.body.classList.remove('robot'); beamCount = 0; flash = .8;
     state = 'stopped'; goBtn.classList.remove('hide'); S.whistle();
     setTimeout(() => A.award(), 600);
@@ -343,42 +481,42 @@ function updRobot(dt) {
 // うかぶ たかさ（じめんから）
 function robotLift() {
   if (!robot) return 0; const t = robot.t;
-  if (t < R_T.pose) return 0;
-  if (t < R_T.lift) return Math.pow(t - R_T.pose, 2.2) * H * .35;
+  if (t < RT.pose) return 0;
+  if (t < RT.lift) return Math.pow(t - RT.pose, 2.2) * H * .35;
   const top = GY - H * .88;
-  if (t < R_T.space) return lerp(GY - H * 1.7, top, ease((t - R_T.lift) / 1.2)) + Math.sin(t * 2) * H * .03;
-  if (t < R_T.back) return lerp(top, 0, ease((t - R_T.space) / (R_T.back - R_T.space)));
+  if (t < RT.space) return lerp(GY - H * 1.7, top, ease((t - RT.lift) / 1.2)) + Math.sin(t * 2) * H * .03;
+  if (t < RT.back) return lerp(top, 0, ease((t - RT.space) / (RT.back - RT.space)));
   return 0;
 }
 function spaceK() {
   if (!robot) return 0; const t = robot.t;
-  if (t < R_T.pose + .8) return 0;
-  if (t < R_T.lift) return ease((t - R_T.pose - .8) / (R_T.lift - R_T.pose - .8));
-  if (t < R_T.space) return 1;
-  return 1 - ease((t - R_T.space) / (R_T.back - R_T.space - .3));
+  if (t < RT.pose + .8) return 0;
+  if (t < RT.lift) return ease((t - RT.pose - .8) / (RT.lift - RT.pose - .8));
+  if (t < RT.space) return 1;
+  return 1 - ease((t - RT.space) / (RT.back - RT.space - .3));
 }
 function robotScale() {
   const t = robot.t;
-  if (t < R_T.lift) return 1;
-  if (t < R_T.space) return .6;
-  if (t < R_T.back) return lerp(.6, 1, ease((t - R_T.space) / (R_T.back - R_T.space)));
+  if (t < RT.lift) return 1;
+  if (t < RT.space) return .6;
+  if (t < RT.back) return lerp(.6, 1, ease((t - RT.space) / (RT.back - RT.space)));
   return 1;
 }
 function morphK() {
   const t = robot.t;
-  if (t < R_T.stop) return 0;
-  if (t < R_T.morph) return ease((t - R_T.stop) / (R_T.morph - R_T.stop));
-  if (t < R_T.back) return 1;
-  return 1 - ease((t - R_T.back) / (R_T.unmorph - R_T.back));
+  if (t < RT.stop) return 0;
+  if (t < RT.morph) return ease((t - RT.stop) / (RT.morph - RT.stop));
+  if (t < RT.back) return 1;
+  return 1 - ease((t - RT.back) / (RT.unmorph - RT.back));
 }
 function drawSpace(k) {
   if (k <= 0) return;
   ctx.globalAlpha = k;
   const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#05051c'); g.addColorStop(1, '#2a1a5e');
   ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, H + 40);
-  const inSpace = robot && robot.t > R_T.lift && robot.t < R_T.space;
+  const inSpace = robot && robot.t > RT.lift && robot.t < RT.space;
   for (const st of spaceStars) {
-    if (robot) { st.x -= (inSpace ? .25 : .02) * st.z / 60; st.y += (!inSpace && robot.t < R_T.lift ? .6 : 0) * st.z / 60; }
+    if (robot) { st.x -= (inSpace ? .25 : .02) * st.z / 60; st.y += (!inSpace && robot.t < RT.lift ? .6 : 0) * st.z / 60; }
     if (st.x < 0) st.x += 1; if (st.y > 1) st.y -= 1;
     ctx.fillStyle = `rgba(255,255,230,${.5 + .5 * st.z})`;
     if (inSpace) ctx.fillRect(st.x * W, st.y * H, 2 + st.z * 18, 2);
@@ -389,8 +527,7 @@ function drawSpace(k) {
   ctx.fillStyle = '#ffb3d1'; ctx.beginPath(); ctx.arc(px, py, pr, 0, 7); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.arc(px - pr * .3, py - pr * .3, pr * .35, 0, 7); ctx.fill();
   ctx.strokeStyle = '#ffe066'; ctx.lineWidth = pr * .16; ctx.beginPath(); ctx.ellipse(px, py, pr * 1.8, pr * .45, -.3, 0, 7); ctx.stroke();
-  ctx.fillStyle = '#6fb2ff'; ctx.beginPath(); ctx.arc(W * .15, H * 1.25, H * .55, 0, 7); ctx.fill();
-  ctx.fillStyle = '#7ccf6b'; ctx.beginPath(); ctx.ellipse(W * .12, H * .8, H * .12, H * .06, .4, 0, 7); ctx.ellipse(W * .28, H * .9, H * .1, H * .05, -.3, 0, 7); ctx.fill();
+  drawEarth();
   emo('🌙', W * .45, H * .18, H * .09, 'middle');
   ctx.globalAlpha = 1;
   for (const it of spaceItems) {
@@ -401,11 +538,12 @@ function drawSpace(k) {
 }
 // でんしゃの パーツ → ロボットの パーツ
 function drawRobot() {
-  const g = geo(), k = morphK(), u = g.Ht * 1.15, cx = trainCx(), lift = robotLift();
+  const mo = robotMovieOffset();
+  const g = geo(), k = morphK(), u = g.Ht * 1.15, cx = trainCx() + (W * .76 - trainCx()) * mo, lift = robotLift() + H * .12 * mo;
   const foot = GY - lift + (lift > 0 ? Math.sin(time * 6) * 3 : 0);
   const c = { body: col.body || '#ff8fc4', stripe: col.stripe || '#ffd23f', belly: col.belly || '#ffffff' };
-  const pose = robot.t > R_T.morph && robot.t < R_T.back ? 1 : 0;
-  const armUp = pose ? Math.min(1, (robot.t - R_T.morph) * 2) : 0;
+  const pose = robot.t > RT.morph && robot.t < RT.back ? 1 : 0;
+  const armUp = pose ? Math.min(1, (robot.t - RT.morph) * 2) : 0;
   const car = i => g.x0 + i * (g.L + g.gap);
   const P = [
     // [なまえ, [はじめの x, y, はば, たかさ, かいてん], [おわりの …]]
@@ -418,7 +556,7 @@ function drawRobot() {
   ];
   const sc = robotScale(); ctx.save(); ctx.translate(cx, foot); ctx.scale(sc, sc); ctx.translate(-cx, -foot);
   // ジェット
-  if (lift > 2 || (robot.t > R_T.pose - .3 && robot.t < R_T.back)) {
+  if (lift > 2 || (robot.t > RT.pose - .3 && robot.t < RT.back)) {
     for (const s of [-1, 1]) {
       const fx = cx + s * u * .5, fy = foot, fl = u * (1.2 + Math.random() * .6) * (lift > 2 ? 1.4 : .6);
       const gr = ctx.createLinearGradient(0, fy, 0, fy + fl); gr.addColorStop(0, '#ffffff'); gr.addColorStop(.3, '#ffe066'); gr.addColorStop(1, 'rgba(255,90,60,0)');
@@ -458,6 +596,7 @@ function drawRobot() {
   }
   if (k > 0 && k < 1) for (let i = 0; i < 3; i++) emo('✨', cx + (Math.random() - .5) * u * 4, foot - Math.random() * u * 5, u * .6, 'middle');
   ctx.restore();
+  drawMovieBeam(cx, foot - u * 4.75 * sc);
 }
 
 $('beam').addEventListener('pointerdown', e => { e.stopPropagation(); fireBeam(); });
@@ -553,6 +692,7 @@ function newStation() {
 cv.addEventListener('pointerdown', e => {
   if (state === 'pick' || A.stickerOpen) return;
   if (robot) {
+    if (movieM() >= 0 && movieM() < MOVIE) return;
     for (const it of spaceItems) if (!it.got && Math.hypot(e.clientX - it.x, e.clientY - it.y) < H * .08) {
       it.got = .01; score++; $('score').textContent = '⭐ ' + score; S.pop(); burst(it.x, it.y); return; }
     burst(e.clientX, e.clientY, 8); S.sparkle(); return;
@@ -1042,7 +1182,7 @@ function loop(now) {
   drawStation(true);
   drawTrack(fade < 1 ? mix(prev.ground, cur.ground, fade) : cur.ground, nightK > 0.5);
   drawBridges();
-  if (!robot || robot.t < R_T.stop) drawTrain(nightK);
+  if (!robot || robot.t < RT.stop) drawTrain(nightK);
   drawTunnels(true);
   drawStation(false);
   drawSnow(snowK, dt);
@@ -1050,7 +1190,7 @@ function loop(now) {
   drawItems();
   for (const p of parts) { ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); }
   ctx.globalAlpha = 1;
-  if (robot) { drawSpace(spaceK()); if (robot.t >= R_T.stop) drawRobot(); }
+  if (robot) { drawSpace(spaceK()); if (robot.t >= RT.stop) drawRobot(); drawLetterbox(); }
   drawBeam();
   ctx.restore();
   requestAnimationFrame(loop);
